@@ -1,0 +1,80 @@
+Build the frontend foundation for a project called "Nexus AI" — a multi-agent AI orchestration platform.
+
+Do NOT build any AI functionality yet. This phase is UI only.
+
+---
+
+DESIGN SYSTEM
+
+Apply this across every component:
+
+Theme: Premium pixel-art cyberpunk gaming aesthetic.
+Inspired by: Katana ZERO, Hyper Light Drifter, synthwave pixel interfaces.
+
+Colors:
+* Background: #0B0B0E
+* Primary: #00FFB3
+* Secondary: #00C8FF
+* Highlight: #FF4FD8
+* Danger: #FF5E5E
+* Success: #00FF95
+* Cards: #14141A
+* Borders: pixel-style glowing
+
+Fonts:
+* Press Start 2P → headings only
+* IBM Plex Sans → all body text and content
+
+Visual elements required on every screen:
+* Pixelated glowing borders on all cards
+* Pixel hover effects on all buttons
+* Pixel-style scanline overlay on background (subtle, not distracting)
+* Animated pixel particles in background (lightweight)
+
+---
+
+PAGES TO BUILD
+
+1. Landing Page
+* Animated "NEXUS AI" logo at top center using Press Start 2P
+* Large glowing search bar in center — placeholder: "Ask Nexus anything..."
+* Subtitle below search bar: "Multiple AI minds. One intelligent answer."
+* Small counter below subtitle: "5 free queries remaining today"
+* Background: animated pixel particles + subtle moving stars + pixel scanlines
+* Everything centered, full viewport height
+
+2. Navigation
+* Top left: pixel-styled hamburger menu icon
+* Clicking it opens a smooth slide-out sidebar from the left
+* Sidebar items:
+  * New Chat
+  * Chat History
+  * Analytics
+  * Agent Performance
+  * Saved Conversations
+  * Login
+  * Profile
+  * Settings
+  * Usage & Limits
+  * Documentation
+  * Feedback
+  * Logout
+* Each sidebar item has a pixel-style icon and hover glow effect
+* Sidebar closes when clicking outside it
+
+3. Empty Chat Workspace (placeholder screen)
+* Shown after user submits something from landing page
+* Top bar: conversation title placeholder "New Conversation"
+* Middle: empty area with centered message "Agents are standing by..."
+* Bottom: prompt input bar with send button
+* Same cyberpunk design system
+* Show remaining query count in bottom bar: "28 queries remaining today"
+
+---
+
+TECH STACK
+* Next.js 15
+* React
+* TypeScript
+* Tailwind CSS
+* Framer Motion for all animations
