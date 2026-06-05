@@ -1,0 +1,152 @@
+Completely redesign the Nexus AI UI with a cartoonish cyberpunk style.
+Think: pixel-art RPG meets Saturday morning cartoon meets futuristic 
+command center. Bold, fun, chunky, colorful — but still premium and readable.
+
+---
+
+CARTOONISH DESIGN RULES (apply everywhere):
+
+* Thick chunky borders on everything (3-4px minimum, not thin lines)
+* Rounded corners on all cards and buttons (12-16px border radius)
+* Bold drop shadows that are visible and colorful 
+  (e.g. shadow-[4px_4px_0px_#00FFB3] — hard offset shadows, not blurs)
+* Colors are bright and punchy, not muted
+* Icons are chunky and bold, not thin outline style
+* Buttons look "pressable" — have a 3D push-down effect on click
+  (transform: translateY(2px) + shadow shrinks on active)
+* Everything slightly oversized — generous padding, big text, chunky inputs
+* Wobble or bounce animations on key elements (logo, agent icons)
+* Agent icons look like cartoon character avatars, not corporate logos
+* Use emoji-style decorative elements sparingly: ⚡ 🧠 🎯 ✦ ◈
+* Think: if a 16-year-old gamer saw this, they would say "this is sick"
+
+---
+
+BUILD TWO SCREENS:
+
+SCREEN 1: LANDING PAGE
+
+Background:
+* Deep dark #0B0B0E base
+* Chunky pixel grid overlay (brighter, more visible than before)
+* Large colorful pixel particles: #00FFB3, #FF4FD8, #00C8FF
+  — bigger squares, some slowly rotating
+* 4 corner bracket decorations, thick and chunky
+
+Logo section (top center):
+* "NEXUS" on one line, "AI" on second line
+* Press Start 2P font, very large (64px desktop)
+* Each word has a different glow color: NEXUS = #00FFB3, AI = #FF4FD8
+* Logo has a cartoon bounce-in animation on load (spring physics)
+* Small lightning bolt ⚡ icon bouncing beside the logo
+* Below logo: "MULTI-AGENT INTELLIGENCE PLATFORM"
+  IBM Plex Sans, #00C8FF, wide letter spacing, smaller size
+
+Search bar (center):
+* Very chunky input — 64px tall minimum
+* Thick 3px border #00FFB3 with hard colored drop shadow
+  box-shadow: 4px 4px 0px #00FFB3
+* Rounded corners 12px
+* Large placeholder text: "Ask Nexus anything..."
+* "LAUNCH ⚡" button attached to right side of input
+  - Bright #00FFB3 background, #0B0B0E text
+  - Thick dark border + hard drop shadow
+  - Bounces slightly on hover
+  - Pushes down on click (3D press effect)
+* Below input: "Multiple AI minds. One intelligent answer."
+  soft gray, IBM Plex Sans
+* Below that: pill badge "⚡ 5 free queries remaining today"
+  chunky pill, thick border, bouncy
+
+Agent pills row (below search):
+* Label above: "AVAILABLE AGENTS" in small Press Start 2P
+* Row of chunky cartoon-style agent cards:
+  GPT 🤖 • Claude 🧠 • Gemini ✦ • DeepSeek 🔍 • Mistral ⚡ • Perplexity 🎯
+* Each pill: thick border, hard drop shadow in agent's accent color
+  rounded 10px, slight hover tilt (rotate 2deg) + scale up
+* Fun hover effect: card pops up like a sticker being peeled
+
+---
+
+SCREEN 2: CHAT WORKSPACE
+
+Top bar:
+* Left: chunky pixel hamburger menu (thick lines, not thin)
+* Center: conversation title + blinking chunky cursor
+* Right: "28 queries ⚡" pill (chunky, colored border) 
+  + green status dot with cartoon pulse animation
+* Bottom border: thick 2px glowing line
+
+Agent panels (3 cards in a row):
+* Cards are chunky and rounded (16px radius)
+* Thick colored borders with hard drop shadows
+  GPT → shadow #00C8FF
+  Claude → shadow #FF4FD8  
+  Gemini → shadow #00FFB3
+* Each card has:
+  * Agent name in Press Start 2P (small, top left)
+  * Cartoon avatar placeholder — a simple geometric face/icon
+    for each agent (can be emoji or simple SVG)
+  * "STANDING BY..." status with a blinking dot animation
+  * Idle breathing glow on border
+* Cards slightly tilted on hover (rotate 1-2deg) + scale 1.02
+
+Synthesis panel (below agent cards):
+* Wider card, same chunky style
+* Pink/highlight border: thick, hard shadow #FF4FD8
+* Header: "◈ NEXUS SYNTHESIS" in Press Start 2P
+* Status: "AWAITING AGENT OUTPUTS..."
+* Subtle animated dashed border (marching ants effect)
+
+Mode toggle:
+* Two big chunky pill buttons: "⚡ AUTO" and "⚙ MANUAL"
+* Active: bright filled background + hard drop shadow
+* Inactive: dark background, dimmed border
+* Toggle has a satisfying slide animation
+
+Bottom input bar:
+* Tall chunky input (56px+), thick border, rounded corners
+* Hard drop shadow on entire input container
+* Glowing send button — square with rounded corners
+* Send button has cartoon arrow icon, bounces on hover
+* Input container floats above bottom with visible margin
+
+Sidebar:
+* Background #0D0D12 with subtle diagonal pixel pattern
+* Top: small NEXUS AI logo + "v1.0" badge (chunky pill)
+* Each menu item:
+  * Chunky icon (bold, filled style) + label
+  * On hover: entire row gets a thick left border accent
+    + background brightens + subtle slide-right animation
+* Section labels in small Press Start 2P (e.g. "NAVIGATION")
+* Usage bar at bottom — chunky progress bar with glow fill
+  "12 / 30 queries used today"
+  Progress fill animates on load
+
+---
+
+ANIMATION GUIDELINES:
+* Logo: spring bounce-in on page load
+* Agent pills: staggered bounce-in (one by one, 100ms delay each)
+* Cards: float up from below on enter (Framer Motion)
+* Buttons: scale + shadow on hover, press-down on click
+* Sidebar: slide in from left with slight bounce at end
+* Page transition landing → chat: 
+  search bar expands + screen wipes to chat workspace
+* All animations feel snappy and fun, not slow or corporate
+
+---
+
+GLOBAL RULES:
+* Press Start 2P → logo, panel headers, badges, section labels only
+* IBM Plex Sans → everything else
+* Hard drop shadows everywhere (offset, not blur)
+* Chunky thick borders on all interactive elements
+* Bright punchy colors, never muted or pastel
+* Everything has personality — nothing looks default or boring
+
+---
+
+TECH STACK: Next.js 15, React, TypeScript, Tailwind CSS, Framer Motion
+
+---

@@ -47,40 +47,86 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             initial={{ x: "-100%" }}
             animate={{ x: 0 }}
             exit={{ x: "-100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed top-0 left-0 bottom-0 w-[280px] bg-[#0D0D12] border-r border-secondary/50 shadow-[2px_0_12px_rgba(0,200,255,0.2)] z-50 flex flex-col"
+            transition={{ type: "spring", damping: 20, stiffness: 180 }}
+            className="fixed top-0 left-0 bottom-0 w-[280px] bg-[#0D0D12] border-r-[3px] border-[#00C8FF] shadow-[4px_0px_0px_#00C8FF] z-50 flex flex-col"
+            style={{
+              backgroundImage: 'repeating-linear-gradient(45deg, rgba(0,200,255,0.025) 0px, rgba(0,200,255,0.025) 1px, transparent 1px, transparent 8px)'
+            }}
             data-testid="sidebar"
           >
-            <div className="p-6 border-b border-border/20">
-              <h2 className="font-display text-[10px] text-primary tracking-widest text-shadow-primary">NEXUS AI</h2>
+            {/* HEADER */}
+            <div className="p-5 flex flex-col items-start gap-3">
+              <h2 className="font-display text-xs tracking-widest mt-1">
+                <span className="text-[#00FFB3]">NEXUS</span> <span className="text-[#FF4FD8]">AI</span>
+              </h2>
+              <div className="bg-primary/10 border border-primary rounded-full px-2 py-0.5 text-[9px] font-sans font-bold text-[#00FFB3]">
+                v1.0
+              </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto py-4 flex flex-col gap-1 px-3 custom-scrollbar">
-              <div className="mb-2 px-3 text-[10px] uppercase text-muted-foreground tracking-wider font-semibold">Workspace</div>
+            <div className="flex-1 overflow-y-auto py-2 flex flex-col gap-1 px-3 custom-scrollbar">
+              <div className="font-display text-[8px] text-[#555] tracking-widest px-4 mb-2 mt-4">
+                NAVIGATION
+              </div>
               {mainItems.map((item) => {
                 const active = location === item.path;
                 return (
                   <Link key={item.path} href={item.path} onClick={onClose} className="block">
-                    <div className={`flex items-center gap-3 px-3 py-2.5 rounded-sm transition-all duration-200 cursor-pointer group ${active ? 'bg-primary/10 text-primary' : 'text-secondary/70 hover:bg-primary/10 hover:text-primary'}`} data-testid={`sidebar-link-${item.label.replace(/\s+/g, '-').toLowerCase()}`}>
-                      <item.icon size={18} className={`transition-colors ${active ? 'text-primary' : 'text-secondary group-hover:text-primary'}`} />
-                      <span className="text-sm font-medium">{item.label}</span>
+                    <div 
+                      className={`flex flex-row items-center gap-3 px-4 py-3 rounded-xl cursor-pointer font-sans font-medium transition-all group ${
+                        active 
+                          ? 'bg-primary/10 border-l-[4px] border-primary text-primary' 
+                          : 'text-[#888] hover:bg-[rgba(0,255,179,0.06)] hover:border-l-[4px] hover:border-primary hover:text-primary border-l-[4px] border-transparent hover:translate-x-1'
+                      }`} 
+                      data-testid={`sidebar-link-${item.label.replace(/\s+/g, '-').toLowerCase()}`}
+                    >
+                      <item.icon size={20} strokeWidth={2.5} className={`transition-colors ${active ? 'text-[#00FFB3]' : 'text-[#888] group-hover:text-[#00FFB3]'}`} />
+                      <span className="text-sm">{item.label}</span>
                     </div>
                   </Link>
                 );
               })}
 
-              <div className="mt-6 mb-2 px-3 text-[10px] uppercase text-muted-foreground tracking-wider font-semibold">System</div>
+              <div className="font-display text-[8px] text-[#555] tracking-widest px-4 mb-2 mt-6">
+                SYSTEM
+              </div>
               {bottomItems.map((item) => {
                 const active = location === item.path;
                 return (
                   <Link key={item.path} href={item.path} onClick={onClose} className="block">
-                    <div className={`flex items-center gap-3 px-3 py-2.5 rounded-sm transition-all duration-200 cursor-pointer group ${active ? 'bg-primary/10 text-primary' : 'text-secondary/70 hover:bg-primary/10 hover:text-primary'}`} data-testid={`sidebar-link-${item.label.replace(/\s+/g, '-').toLowerCase()}`}>
-                      <item.icon size={18} className={`transition-colors ${active ? 'text-primary' : 'text-secondary group-hover:text-primary'}`} />
-                      <span className="text-sm font-medium">{item.label}</span>
+                    <div 
+                      className={`flex flex-row items-center gap-3 px-4 py-3 rounded-xl cursor-pointer font-sans font-medium transition-all group ${
+                        active 
+                          ? 'bg-primary/10 border-l-[4px] border-primary text-primary' 
+                          : 'text-[#888] hover:bg-[rgba(0,255,179,0.06)] hover:border-l-[4px] hover:border-primary hover:text-primary border-l-[4px] border-transparent hover:translate-x-1'
+                      }`} 
+                      data-testid={`sidebar-link-${item.label.replace(/\s+/g, '-').toLowerCase()}`}
+                    >
+                      <item.icon size={20} strokeWidth={2.5} className={`transition-colors ${active ? 'text-[#00FFB3]' : 'text-[#888] group-hover:text-[#00FFB3]'}`} />
+                      <span className="text-sm">{item.label}</span>
                     </div>
                   </Link>
                 );
               })}
+            </div>
+
+            {/* USAGE BAR */}
+            <div className="sticky bottom-0 p-4 border-t-2 border-[#14141A] bg-[#0D0D12]">
+              <div className="font-sans text-xs text-[#555] font-bold mb-2">
+                12 / 30 QUERIES TODAY
+              </div>
+              <div className="h-[10px] bg-[#14141A] rounded-full border border-border overflow-hidden relative">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: "40%" }}
+                  transition={{ duration: 1.5, delay: 0.5 }}
+                  className="h-full rounded-full"
+                  style={{
+                    background: "linear-gradient(90deg, #00FFB3, #00C8FF)",
+                    boxShadow: "0 0 8px rgba(0,255,179,0.5)"
+                  }}
+                />
+              </div>
             </div>
           </motion.div>
         </>

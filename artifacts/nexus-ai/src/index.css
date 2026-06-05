@@ -94,14 +94,42 @@
     text-shadow: 0 0 10px rgba(0,255,179,0.7);
   }
   
+  .cartoon-card {
+    @apply border-4 border-primary rounded-2xl bg-card;
+    box-shadow: 4px 4px 0px #00FFB3;
+  }
+  
+  .cartoon-card-cyan {
+    @apply border-4 border-secondary rounded-2xl bg-card;
+    box-shadow: 4px 4px 0px #00C8FF;
+  }
+  
+  .cartoon-card-pink {
+    @apply border-4 border-accent rounded-2xl bg-card;
+    box-shadow: 4px 4px 0px #FF4FD8;
+  }
+  
+  .chunky-button {
+    @apply border-4 rounded-xl transition-all duration-150 active:translate-y-[2px] active:shadow-none hover:scale-105;
+    box-shadow: 4px 4px 0px currentColor;
+  }
+
+  .chunky-button-filled {
+    @apply border-4 rounded-xl transition-all duration-150 active:translate-y-[2px] hover:scale-105 bg-primary text-primary-foreground border-primary;
+    box-shadow: 4px 4px 0px #00C8FF;
+  }
+
+  .diagonal-pattern {
+    background: repeating-linear-gradient(45deg, rgba(0,200,255,0.03) 0px, rgba(0,200,255,0.03) 1px, transparent 1px, transparent 8px);
+  }
+  
   .pixel-button {
-    @apply relative border-2 border-primary text-primary transition-all duration-200 bg-transparent active:scale-[0.97];
-    box-shadow: 0 0 8px rgba(0,255,179,0.2), inset 0 0 8px rgba(0,255,179,0.1);
+    @apply relative border-4 border-primary text-primary transition-all duration-150 bg-transparent rounded-xl active:translate-y-[2px] active:shadow-none hover:scale-105;
+    box-shadow: 4px 4px 0px #00FFB3;
   }
   
   .pixel-button:hover {
     @apply bg-primary/10;
-    box-shadow: 0 0 16px rgba(0,255,179,0.4), inset 0 0 12px rgba(0,255,179,0.2);
   }
   
   .scanline {
