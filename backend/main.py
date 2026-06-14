@@ -24,10 +24,7 @@ from backend.websocket.handler import handle_chat_websocket, decode_token
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting up FastAPI application...")
-    try:
-        init_pool()
-    except Exception as e:
-        logger.error(f"Failed to initialize connection pool: {e}")
+    init_pool()
     yield
     # Shutdown
     logger.info("Shutting down FastAPI application...")
@@ -84,6 +81,21 @@ async def get_current_user_id(authorization: Optional[str] = Header(None)) -> st
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+@app.get("/api/health/db")
+def db_health_check():
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+                cur.fetchone()
+        return {"status": "ok", "database": "connected"}
+    except Exception as e:
+        logger.error(f"Database health check failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database connection failed",
+        )
 
 # REST: List conversations
 @app.get("/api/ai/conversations")

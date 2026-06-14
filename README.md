@@ -4,7 +4,7 @@ Nexus-style AI chat frontend + lightweight Python backend for streaming AI respo
 
 **What it does**
 - Frontend: React app with chat UI, WebSocket client for streaming replies, conversation UI and user flows.
-- Backend: FastAPI WebSocket endpoint that streams agent responses (OpenAI / Anthropic / Gemini providers), persists conversations/messages, and enforces per-user rate limits via `user_limits` table.
+- Backend: FastAPI WebSocket endpoint that streams agent responses (OpenAI / Anthropic / Gemini / Groq providers), persists conversations/messages, and enforces per-user rate limits via `user_limits` table.
 
 **Repository layout (important parts)**
 - `artifacts/nexus-ai/` — React + Vite frontend
@@ -33,6 +33,7 @@ FRONTEND_URL=http://localhost:5173
 PORT=3000
 OPENAI_API_KEY=...
 ANTHROPIC_API_KEY=...
+GROQ_API_KEY=...  # use your own Groq API key here
 GEMINI_API_URL=
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-default
@@ -148,7 +149,7 @@ If port 5173 is in use, change `PORT` or stop the other process.
 - Port conflict when starting frontend
   - If Vite reports port busy, change `PORT` env var before `pnpm dev` or kill the process holding that port.
 
-- Provider API errors (OpenAI / Anthropic / Gemini)
+- Provider API errors (OpenAI / Anthropic / Gemini / Groq)
   - Confirm API keys are set in `.env`. Check provider-specific logs in `backend/` — provider modules will log errors.
 
 - `psycopg2` or dependency issues
