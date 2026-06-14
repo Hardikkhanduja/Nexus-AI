@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
+import { useUsage } from "@/hooks/useUsage";
 
 interface LandingPageProps {
   onOpenSidebar: () => void;
@@ -17,6 +19,8 @@ const agents = [
 
 export default function LandingPage({ onOpenSidebar }: LandingPageProps) {
   const [, setLocation] = useLocation();
+  const { user, isAuthenticated } = useAuth();
+  const { remaining } = useUsage();
   const [query, setQuery] = useState("");
   const [isFocused, setIsFocused] = useState(false);
 
@@ -41,6 +45,33 @@ export default function LandingPage({ onOpenSidebar }: LandingPageProps) {
           <div className="h-[4px] bg-[#00FFB3] w-full rounded-full"></div>
         </div>
       </button>
+
+      {/* USER PROFILE IN TOP-RIGHT */}
+      <div className="absolute top-6 right-6 z-20">
+        {isAuthenticated && user ? (
+          <Link href="/profile">
+            <button 
+              className="w-12 h-12 rounded-full border-2 border-[#00FFB3] shadow-[0_0_10px_rgba(0,255,179,0.3)] overflow-hidden flex items-center justify-center bg-[#14141A] transition-all hover:scale-105 cursor-pointer"
+              data-testid="header-avatar"
+            >
+              {user.avatarUrl ? (
+                <img src={user.avatarUrl} alt={user.name || "Avatar"} className="w-full h-full object-cover" />
+              ) : (
+                <div className="font-display text-xs text-[#00FFB3]">{user.name?.slice(0, 1).toUpperCase() || "?"}</div>
+              )}
+            </button>
+          </Link>
+        ) : (
+          <Link href="/login">
+            <button 
+              className="px-4 py-2 border-2 border-[#FF4FD8] text-[#FF4FD8] rounded-lg font-sans font-bold text-xs bg-background transition-all hover:bg-[#FF4FD8]/10 hover:shadow-[2px_2px_0px_#FF4FD8] active:translate-y-[1px] cursor-pointer"
+              data-testid="header-login-btn"
+            >
+              LOGIN ⚡
+            </button>
+          </Link>
+        )}
+      </div>
 
       <motion.div
         initial={{ scale: 0.3, opacity: 0 }}
@@ -101,7 +132,7 @@ export default function LandingPage({ onOpenSidebar }: LandingPageProps) {
             Multiple AI minds. One intelligent answer.
           </p>
           <div className="border-2 border-secondary rounded-full px-4 py-1.5 text-sm text-[#00C8FF] font-bold font-sans flex items-center gap-2">
-            ⚡ 5 free queries remaining today
+            ⚡ {remaining} free queries remaining today
           </div>
         </div>
       </motion.form>

@@ -9,7 +9,12 @@ import { Sidebar } from "@/components/Sidebar";
 import LandingPage from "@/pages/LandingPage";
 import ChatWorkspace from "@/pages/ChatWorkspace";
 import PlaceholderPage from "@/pages/PlaceholderPage";
+import LoginPage from "@/pages/LoginPage";
+import SignUpPage from "@/pages/SignUpPage";
+import ProfilePage from "@/pages/ProfilePage";
+import UsagePage from "@/pages/UsagePage";
 import NotFound from "@/pages/not-found";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const queryClient = new QueryClient();
 
@@ -30,15 +35,19 @@ function AppRouter() {
           <Route path="/chat">
             <ChatWorkspace onOpenSidebar={openSidebar} />
           </Route>
+          <Route path="/chat/:conversationId">
+            <ChatWorkspace onOpenSidebar={openSidebar} />
+          </Route>
           
           <Route path="/history"><PlaceholderPage title="CHAT HISTORY" onOpenSidebar={openSidebar} /></Route>
           <Route path="/analytics"><PlaceholderPage title="ANALYTICS" onOpenSidebar={openSidebar} /></Route>
           <Route path="/performance"><PlaceholderPage title="AGENT PERFORMANCE" onOpenSidebar={openSidebar} /></Route>
           <Route path="/saved"><PlaceholderPage title="SAVED CONVERSATIONS" onOpenSidebar={openSidebar} /></Route>
-          <Route path="/login"><PlaceholderPage title="LOGIN" onOpenSidebar={openSidebar} /></Route>
-          <Route path="/profile"><PlaceholderPage title="PROFILE" onOpenSidebar={openSidebar} /></Route>
+          <Route path="/login"><LoginPage /></Route>
+          <Route path="/signup"><SignUpPage /></Route>
+          <Route path="/profile"><ProfilePage onOpenSidebar={openSidebar} /></Route>
           <Route path="/settings"><PlaceholderPage title="SETTINGS" onOpenSidebar={openSidebar} /></Route>
-          <Route path="/usage"><PlaceholderPage title="USAGE & LIMITS" onOpenSidebar={openSidebar} /></Route>
+          <Route path="/usage"><UsagePage onOpenSidebar={openSidebar} /></Route>
           <Route path="/docs"><PlaceholderPage title="DOCUMENTATION" onOpenSidebar={openSidebar} /></Route>
           <Route path="/feedback"><PlaceholderPage title="FEEDBACK" onOpenSidebar={openSidebar} /></Route>
           <Route path="/logout"><PlaceholderPage title="LOGOUT" onOpenSidebar={openSidebar} /></Route>
@@ -55,7 +64,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <AppRouter />
+          <AuthProvider>
+            <AppRouter />
+          </AuthProvider>
         </WouterRouter>
         <Toaster />
       </TooltipProvider>

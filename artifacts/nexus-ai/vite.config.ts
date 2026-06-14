@@ -63,6 +63,21 @@ export default defineConfig({
     strictPort: true,
     host: "0.0.0.0",
     allowedHosts: true,
+    proxy: {
+      "/ws/chat": {
+        target: "ws://localhost:8000",
+        ws: true,
+        changeOrigin: true,
+      },
+      "/api/ai": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
+      "/api": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+      },
+    },
     fs: {
       strict: true,
     },
