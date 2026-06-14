@@ -43,6 +43,12 @@ def _register_providers() -> None:
     except Exception as e:
         logger.warning(f"Gemini provider unavailable: {e}")
 
+    try:
+        from .groq_provider import GroqProvider
+        _REGISTRY["groq"] = GroqProvider
+    except Exception as e:
+        logger.warning(f"Groq provider unavailable: {e}")
+
 
 def get_provider(name: str) -> BaseProvider:
     """
