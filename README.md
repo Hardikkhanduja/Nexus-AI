@@ -1,4 +1,4 @@
-# Nexu Frontend (and Backend)
+# NexusAI
 
 Nexus-style AI chat frontend + lightweight Python backend for streaming AI responses, conversation persistence, and rate limiting. This repo contains a Vite + React frontend (in `artifacts/nexus-ai`) and a FastAPI backend (in `backend`) that connects to a PostgreSQL database — Supabase is the recommended hosting option.
 
