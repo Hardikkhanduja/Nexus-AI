@@ -24,14 +24,20 @@ def init_pool() -> None:
     global _pool
     database_url = os.environ.get("DATABASE_URL")
     if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable is required.")
+        logger.warning("DATABASE_URL is not set; database features will be unavailable.")
+        _pool = None
+        return
 
-    _pool = psycopg2.pool.SimpleConnectionPool(
-        minconn=2,
-        maxconn=10,
-        dsn=database_url,
-    )
-    logger.info("Database connection pool initialized.")
+    try:
+        _pool = psycopg2.pool.SimpleConnectionPool(
+            minconn=2,
+            maxconn=10,
+            dsn=database_url,
+        )
+        logger.info("Database connection pool initialized.")
+    except Exception as exc:
+        logger.warning(f"Database connection pool unavailable: {exc}")
+        _pool = None
 
 
 def get_pool() -> psycopg2.pool.SimpleConnectionPool:
@@ -39,7 +45,8 @@ def get_pool() -> psycopg2.pool.SimpleConnectionPool:
     global _pool
     if _pool is None:
         init_pool()
-    assert _pool is not None
+    if _pool is None:
+        raise RuntimeError("Database pool is unavailable")
     return _pool
 
 

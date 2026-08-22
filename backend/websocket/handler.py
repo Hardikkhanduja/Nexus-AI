@@ -24,6 +24,16 @@ def decode_token(token: str) -> Optional[Dict[str, Any]]:
         logger.error(f"Failed to decode token: {e}")
         return None
 
+
+def open_connection():
+    """Return a DB connection context manager, or None if the DB is unavailable."""
+    try:
+        return get_connection()
+    except Exception as exc:
+        logger.warning(f"Database unavailable: {exc}")
+        return None
+
+
 async def handle_chat_websocket(websocket: WebSocket):
     # Accept the connection first
     await websocket.accept()
@@ -76,15 +86,17 @@ async def handle_chat_websocket(websocket: WebSocket):
 
             # 2. Check rate limit
             await websocket.send_json({"type": "status", "message": "Checking usage limit..."})
-            
-            # Use database connection to check/increment rate limits
-            try:
-                with get_connection() as conn:
-                    allowed, remaining, limit = await check_and_increment(conn, user_id)
-            except Exception as e:
-                logger.error(f"Database error during rate limit check: {e}")
-                await websocket.send_json({"type": "error", "message": "Database error checking limits."})
-                continue
+
+            conn_ctx = open_connection()
+            if conn_ctx is not None:
+                try:
+                    with conn_ctx as conn:
+                        allowed, remaining, limit = await check_and_increment(conn, user_id)
+                except Exception as e:
+                    logger.warning(f"Rate-limit DB unavailable; using fallback limits: {e}")
+                    allowed, remaining, limit = await check_and_increment(None, user_id)
+            else:
+                allowed, remaining, limit = await check_and_increment(None, user_id)
 
             await websocket.send_json({"type": "rate_limit_status", "remaining": remaining, "limit": limit})
 
@@ -101,34 +113,11 @@ async def handle_chat_websocket(websocket: WebSocket):
                 if not conversation_id:
                     conversation_id = str(uuid.uuid4())
                     is_new_conversation = True
-                    # Create conversation in DB
-                    try:
-                        with get_connection() as conn:
-                            with conn.cursor() as cur:
-                                cur.execute(
-                                    """
-                                    INSERT INTO conversations (id, user_id, title, created_at, updated_at)
-                                    VALUES (%s, %s, %s, NOW(), NOW())
-                                    """,
-                                    (conversation_id, user_id, title),
-                                )
-                                conn.commit()
-                    except Exception as e:
-                        logger.error(f"Failed to create conversation: {e}")
-                        await websocket.send_json({"type": "error", "message": "Failed to create conversation in database."})
-                        continue
-                else:
-                    # Verify conversation exists and belongs to the user
-                    try:
-                        with get_connection() as conn:
-                            with conn.cursor() as cur:
-                                cur.execute(
-                                    "SELECT id, title FROM conversations WHERE id = %s AND user_id = %s",
-                                    (conversation_id, user_id),
-                                )
-                                row = cur.fetchone()
-                                if not row:
-                                    # Create it if it doesn't exist (or was created client side)
+                    conn_ctx = open_connection()
+                    if conn_ctx is not None:
+                        try:
+                            with conn_ctx as conn:
+                                with conn.cursor() as cur:
                                     cur.execute(
                                         """
                                         INSERT INTO conversations (id, user_id, title, created_at, updated_at)
@@ -137,13 +126,41 @@ async def handle_chat_websocket(websocket: WebSocket):
                                         (conversation_id, user_id, title),
                                     )
                                     conn.commit()
-                                    is_new_conversation = True
-                                else:
-                                    title = row[1]
-                    except Exception as e:
-                        logger.error(f"Failed to verify/create conversation: {e}")
-                        await websocket.send_json({"type": "error", "message": "Database error checking conversation."})
-                        continue
+                        except Exception as e:
+                            logger.error(f"Failed to create conversation: {e}")
+                            logger.warning("Proceeding without persisted conversation due to DB error.")
+                    else:
+                        logger.warning("Skipping conversation creation because the database is unavailable.")
+                else:
+                    # Verify conversation exists and belongs to the user
+                    conn_ctx = open_connection()
+                    if conn_ctx is not None:
+                        try:
+                            with conn_ctx as conn:
+                                with conn.cursor() as cur:
+                                    cur.execute(
+                                        "SELECT id, title FROM conversations WHERE id = %s AND user_id = %s",
+                                        (conversation_id, user_id),
+                                    )
+                                    row = cur.fetchone()
+                                    if not row:
+                                        # Create it if it doesn't exist (or was created client side)
+                                        cur.execute(
+                                            """
+                                            INSERT INTO conversations (id, user_id, title, created_at, updated_at)
+                                            VALUES (%s, %s, %s, NOW(), NOW())
+                                            """,
+                                            (conversation_id, user_id, title),
+                                        )
+                                        conn.commit()
+                                        is_new_conversation = True
+                                    else:
+                                        title = row[1]
+                        except Exception as e:
+                            logger.error(f"Failed to verify/create conversation: {e}")
+                            logger.warning("Proceeding without conversation verification due to DB error.")
+                    else:
+                        logger.warning("Skipping conversation verification because the database is unavailable.")
             else:
                 # Guest user
                 if not conversation_id:
@@ -152,24 +169,28 @@ async def handle_chat_websocket(websocket: WebSocket):
             # Load message history context (only for authenticated users)
             context = []
             if user_id and not is_new_conversation:
-                try:
-                    with get_connection() as conn:
-                        with conn.cursor() as cur:
-                            cur.execute(
-                                """
-                                SELECT role, content FROM messages 
-                                WHERE conversation_id = %s 
-                                ORDER BY created_at ASC 
-                                LIMIT 20
-                                """,
-                                (conversation_id,),
-                            )
-                            rows = cur.fetchall()
-                            for r in rows:
-                                context.append({"role": r[0], "content": r[1]})
-                except Exception as e:
-                    logger.error(f"Failed to load messages context: {e}")
-                    # Non-fatal: log and proceed with empty context
+                conn_ctx = open_connection()
+                if conn_ctx is not None:
+                    try:
+                        with conn_ctx as conn:
+                            with conn.cursor() as cur:
+                                cur.execute(
+                                    """
+                                    SELECT role, content FROM messages 
+                                    WHERE conversation_id = %s 
+                                    ORDER BY created_at ASC 
+                                    LIMIT 20
+                                    """,
+                                    (conversation_id,),
+                                )
+                                rows = cur.fetchall()
+                                for r in rows:
+                                    context.append({"role": r[0], "content": r[1]})
+                    except Exception as e:
+                        logger.error(f"Failed to load messages context: {e}")
+                        # Non-fatal: log and proceed with empty context
+                else:
+                    logger.warning("Skipping message history load because the database is unavailable.")
 
             # 4. Connect to agent and stream response
             await websocket.send_json({"type": "status", "message": "Connecting to agent..."})
@@ -203,40 +224,44 @@ async def handle_chat_websocket(websocket: WebSocket):
 
             # Save the message pair in database (only for authenticated users)
             if user_id:
-                try:
-                    user_msg_id = str(uuid.uuid4())
-                    agent_msg_id = str(uuid.uuid4())
-                    with get_connection() as conn:
-                        with conn.cursor() as cur:
-                            # Save user message
-                            cur.execute(
-                                """
-                                INSERT INTO messages (id, conversation_id, role, content, agent_name, created_at)
-                                VALUES (%s, %s, 'user', %s, %s, NOW())
-                                """,
-                                (user_msg_id, conversation_id, sanitized_content, provider.name),
-                            )
-                            # Save assistant message
-                            cur.execute(
-                                """
-                                INSERT INTO messages (id, conversation_id, role, content, agent_name, created_at)
-                                VALUES (%s, %s, 'assistant', %s, %s, NOW())
-                                """,
-                                (agent_msg_id, conversation_id, full_response, provider.name),
-                            )
-                            # Update conversation updated_at
-                            cur.execute(
-                                """
-                                UPDATE conversations 
-                                SET updated_at = NOW() 
-                                WHERE id = %s
-                                """,
-                                (conversation_id,),
-                            )
-                            conn.commit()
-                except Exception as e:
-                    logger.error(f"Failed to save messages to DB: {e}")
-                    # Non-fatal to streaming, but user won't see history
+                conn_ctx = open_connection()
+                if conn_ctx is not None:
+                    try:
+                        user_msg_id = str(uuid.uuid4())
+                        agent_msg_id = str(uuid.uuid4())
+                        with conn_ctx as conn:
+                            with conn.cursor() as cur:
+                                # Save user message
+                                cur.execute(
+                                    """
+                                    INSERT INTO messages (id, conversation_id, role, content, agent_name, created_at)
+                                    VALUES (%s, %s, 'user', %s, %s, NOW())
+                                    """,
+                                    (user_msg_id, conversation_id, sanitized_content, provider.name),
+                                )
+                                # Save assistant message
+                                cur.execute(
+                                    """
+                                    INSERT INTO messages (id, conversation_id, role, content, agent_name, created_at)
+                                    VALUES (%s, %s, 'assistant', %s, %s, NOW())
+                                    """,
+                                    (agent_msg_id, conversation_id, full_response, provider.name),
+                                )
+                                # Update conversation updated_at
+                                cur.execute(
+                                    """
+                                    UPDATE conversations 
+                                    SET updated_at = NOW() 
+                                    WHERE id = %s
+                                    """,
+                                    (conversation_id,),
+                                )
+                                conn.commit()
+                    except Exception as e:
+                        logger.error(f"Failed to save messages to DB: {e}")
+                        # Non-fatal to streaming, but user won't see history
+                else:
+                    logger.warning("Skipping saving messages because the database is unavailable.")
 
                 # Generate title in the background if it's a new conversation
                 if is_new_conversation:
@@ -245,15 +270,18 @@ async def handle_chat_websocket(websocket: WebSocket):
                         title_prompt = f"Summarize the following prompt in 4-5 words. Output ONLY the short summary, no quotes, no markdown: {sanitized_content}"
                         generated_title = await provider.generate(title_prompt)
                         generated_title = generated_title.strip().strip('"').strip("'")
-                        if generated_title:
+                        if generated_title and open_connection() is not None:
                             title = generated_title
-                            with get_connection() as conn:
-                                with conn.cursor() as cur:
-                                    cur.execute(
-                                        "UPDATE conversations SET title = %s WHERE id = %s",
-                                        (title, conversation_id),
-                                    )
-                                    conn.commit()
+                            try:
+                                with open_connection() as conn:
+                                    with conn.cursor() as cur:
+                                        cur.execute(
+                                            "UPDATE conversations SET title = %s WHERE id = %s",
+                                            (title, conversation_id),
+                                        )
+                                        conn.commit()
+                            except Exception as e:
+                                logger.error(f"Failed to persist generated conversation title: {e}")
                     except Exception as e:
                         logger.error(f"Failed to generate conversation title: {e}")
 
