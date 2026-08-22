@@ -527,111 +527,196 @@ async def get_analytics_metrics(current_user: dict = Depends(get_current_user)):
 
 @app.get("/api/ai/performance")
 async def get_agent_performance_metrics(current_user: dict = Depends(get_current_user)):
-    """Fetch real-time model performance benchmarks from database logs."""
+    """Fetch user-scoped real model performance telemetry strictly from database queries."""
+    clerk_id = current_user.get("clerk_id") or "guest"
+
+    # Static Specs Reference Metadata for All Supported Providers
+    MODEL_SPECS = [
+        {
+            "id": "groq",
+            "name": "Groq LPU (Llama 3.3 70B)",
+            "provider": "Groq LPU Engine",
+            "iconName": "Zap",
+            "color": "#00FFB3",
+            "contextWindow": "128,000 tokens",
+            "description": "Ultra-fast inference via Groq LPUs. Specializes in adversarial debate evaluation."
+        },
+        {
+            "id": "gemini",
+            "name": "Google Gemini (1.5 / 2.0 Flash)",
+            "provider": "Google AI Studio",
+            "iconName": "Sparkles",
+            "color": "#00C8FF",
+            "contextWindow": "1,000,000 tokens",
+            "description": "Massive 1M token context window for multi-perspective synthesis & reasoning."
+        },
+        {
+            "id": "perplexity",
+            "name": "Perplexity Sonar Online",
+            "provider": "Perplexity AI",
+            "iconName": "Target",
+            "color": "#10B981",
+            "contextWindow": "32,000 tokens",
+            "description": "Real-time web search grounding engine. Verifies claims against live web search indexes."
+        },
+        {
+            "id": "nvidia",
+            "name": "NVIDIA NIM (Qwen & Nemotron)",
+            "provider": "NVIDIA NIM Infrastructure",
+            "iconName": "Layers",
+            "color": "#F59E0B",
+            "contextWindow": "64,000 tokens",
+            "description": "High-performance enterprise open models (Qwen 2.5 Coder & Nemotron 4)."
+        },
+        {
+            "id": "openai",
+            "name": "OpenAI GPT-4o Mini",
+            "provider": "OpenAI API",
+            "iconName": "Bot",
+            "color": "#8B5CF6",
+            "contextWindow": "128,000 tokens",
+            "description": "Balanced reasoning engine. Well-suited for code architecture and API evaluation."
+        },
+        {
+            "id": "anthropic",
+            "name": "Anthropic Claude 3.5 Sonnet",
+            "provider": "Anthropic API",
+            "iconName": "Brain",
+            "color": "#FF4FD8",
+            "contextWindow": "200,000 tokens",
+            "description": "Industry-leading reasoning accuracy and edge-case risk detection."
+        }
+    ]
+
     try:
         with get_connection() as conn:
             with conn.cursor() as cur:
-                # Query actual message counts per agent
-                cur.execute("""
-                    SELECT agent_name, COUNT(*) 
+                # Query user-scoped metrics per provider/agent
+                cur.execute(
+                    """
+                    SELECT 
+                        LOWER(COALESCE(provider, agent_name)) as provider_key,
+                        COUNT(*) as call_count,
+                        AVG(latency_ms) as avg_latency,
+                        MAX(created_at) as last_active,
+                        SUM(CASE WHEN was_fallback THEN 1 ELSE 0 END) as fallback_count
                     FROM messages 
-                    WHERE role = 'assistant' AND agent_name IS NOT NULL
-                    GROUP BY agent_name
-                """)
-                msg_counts = dict(cur.fetchall())
-                
-                total_assistant_msgs = sum(msg_counts.values()) or 1
+                    WHERE conversation_id IN (SELECT id FROM conversations WHERE clerk_id = %s)
+                    AND role = 'assistant'
+                    AND (provider IS NOT NULL OR agent_name IS NOT NULL)
+                    GROUP BY LOWER(COALESCE(provider, agent_name))
+                    """,
+                    (clerk_id,),
+                )
+                rows = cur.fetchall()
 
-                benchmarks = [
-                    {
-                        "id": "groq_llama3",
-                        "name": "Groq (Llama 3.3 70B)",
-                        "provider": "Groq LPU Engine",
-                        "iconName": "Zap",
-                        "color": "#00FFB3",
-                        "throughput": "520 tok/sec",
-                        "latency": "0.28s",
-                        "winRate": max(85, min(98, int((msg_counts.get("Groq", 10) / total_assistant_msgs) * 100 + 40))),
-                        "agreementRate": 91,
-                        "contextWindow": "128,000 tokens",
-                        "status": "Optimal",
-                        "description": "Ultra-fast inference via Groq LPUs. Performs adversarial debate evaluation at lightspeed."
-                    },
-                    {
-                        "id": "google_gemini",
-                        "name": "Google Gemini (1.5 / 2.0)",
-                        "provider": "Google AI Studio",
-                        "iconName": "Sparkles",
-                        "color": "#00C8FF",
-                        "throughput": "185 tok/sec",
-                        "latency": "0.65s",
-                        "winRate": max(80, min(95, int((msg_counts.get("Gemini", 12) / total_assistant_msgs) * 100 + 35))),
-                        "agreementRate": 88,
-                        "contextWindow": "1,000,000 tokens",
-                        "status": "Active",
-                        "description": "Massive 1M token context window. Specializes in multi-perspective synthesis & structured JSON."
-                    },
-                    {
-                        "id": "anthropic_claude",
-                        "name": "Anthropic Claude 3.5",
-                        "provider": "Anthropic Bedrock",
-                        "iconName": "Brain",
-                        "color": "#FF4FD8",
-                        "throughput": "140 tok/sec",
-                        "latency": "1.12s",
-                        "winRate": 87,
-                        "agreementRate": 93,
-                        "contextWindow": "200,000 tokens",
-                        "status": "Active",
-                        "description": "Industry-leading reasoning accuracy. Excellent at detecting logical fallacies and edge-case risks."
-                    },
-                    {
-                        "id": "openai_gpt4",
-                        "name": "OpenAI GPT-4o Mini",
-                        "provider": "OpenAI API",
-                        "iconName": "Bot",
-                        "color": "#F59E0B",
-                        "throughput": "160 tok/sec",
-                        "latency": "0.95s",
-                        "winRate": 82,
-                        "agreementRate": 86,
-                        "contextWindow": "128,000 tokens",
-                        "status": "Active",
-                        "description": "Balanced reasoning engine. Well-suited for code architecture and API design evaluations."
-                    },
-                    {
-                        "id": "deepseek_r1",
-                        "name": "DeepSeek R1 Reasoning",
-                        "provider": "DeepSeek AI",
-                        "iconName": "Search",
-                        "color": "#8B5CF6",
-                        "throughput": "110 tok/sec",
-                        "latency": "1.45s",
-                        "winRate": 91,
-                        "agreementRate": 90,
-                        "contextWindow": "64,000 tokens",
-                        "status": "Standby",
-                        "description": "Chain-of-thought mathematical reasoning model. High accuracy on complex step-by-step logic."
-                    },
-                    {
-                        "id": "perplexity_sonar",
-                        "name": "Perplexity Sonar Online",
-                        "provider": "Perplexity AI",
-                        "iconName": "Target",
-                        "color": "#10B981",
-                        "throughput": "135 tok/sec",
-                        "latency": "1.20s",
-                        "winRate": 85,
-                        "agreementRate": 87,
-                        "contextWindow": "32,000 tokens",
-                        "status": "Standby",
-                        "description": "Real-time web search grounding model. Verifies claims against live search indexes."
+                # Build dictionary of real DB metrics
+                db_stats = {}
+                total_user_assistant_msgs = 0
+                for r in rows:
+                    p_key = r[0].lower()
+                    cnt = r[1] or 0
+                    avg_lat = float(r[2]) if r[2] is not None else None
+                    max_dt = r[3]
+                    fb_cnt = int(r[4]) if r[4] is not None else 0
+                    
+                    total_user_assistant_msgs += cnt
+
+                    # Match p_key to canonical spec ID
+                    matched_id = "groq" if "groq" in p_key or "llama" in p_key else \
+                                 "gemini" if "gemini" in p_key or "google" in p_key else \
+                                 "perplexity" if "perplexity" in p_key or "sonar" in p_key else \
+                                 "nvidia" if "nvidia" in p_key or "qwen" in p_key or "nemotron" in p_key else \
+                                 "openai" if "openai" in p_key or "gpt" in p_key else \
+                                 "anthropic" if "anthropic" in p_key or "claude" in p_key else p_key
+
+                    db_stats[matched_id] = {
+                        "call_count": cnt,
+                        "avg_latency": avg_lat,
+                        "last_active": max_dt,
+                        "fallback_count": fb_cnt
                     }
-                ]
-                return {"benchmarks": benchmarks}
+
+                # Construct real benchmarks response
+                benchmarks = []
+                sorted_spec_ids = sorted(
+                    [spec["id"] for spec in MODEL_SPECS],
+                    key=lambda sid: db_stats.get(sid, {}).get("call_count", 0),
+                    reverse=True
+                )
+
+                for spec in MODEL_SPECS:
+                    sid = spec["id"]
+                    stats = db_stats.get(sid)
+
+                    if stats and stats["call_count"] > 0:
+                        has_data = True
+                        calls = stats["call_count"]
+                        avg_lat_ms = stats["avg_latency"]
+                        latency_str = f"{(avg_lat_ms / 1000.0):.2f}s" if avg_lat_ms else "0.00s"
+                        win_rate = round((calls / total_user_assistant_msgs * 100.0), 1) if total_user_assistant_msgs > 0 else 0.0
+                        
+                        last_active_dt = stats["last_active"]
+                        if last_active_dt:
+                            # Handle timezone conversion for comparison
+                            if last_active_dt.tzinfo is None:
+                                now_dt = datetime.now()
+                            else:
+                                now_dt = datetime.now(timezone.utc)
+                            diff_sec = (now_dt - last_active_dt).total_seconds()
+                            if diff_sec < 60:
+                                last_active_str = "Just now"
+                            elif diff_sec < 3600:
+                                last_active_str = f"{int(diff_sec // 60)}m ago"
+                            elif diff_sec < 86400:
+                                last_active_str = f"{int(diff_sec // 3600)}h ago"
+                            else:
+                                last_active_str = f"{int(diff_sec // 86400)}d ago"
+                        else:
+                            last_active_str = "Recently"
+
+                        status = "Optimal" if stats["fallback_count"] == 0 else "Active"
+                        rank = sorted_spec_ids.index(sid) + 1 if calls > 0 else None
+                    else:
+                        has_data = False
+                        calls = 0
+                        latency_str = "N/A"
+                        avg_lat_ms = 0
+                        win_rate = 0.0
+                        last_active_str = None
+                        status = "Standby"
+                        rank = None
+
+                    benchmarks.append({
+                        "id": sid,
+                        "name": spec["name"],
+                        "provider": spec["provider"],
+                        "iconName": spec["iconName"],
+                        "color": spec["color"],
+                        "hasData": has_data,
+                        "totalCalls": calls,
+                        "latency": latency_str,
+                        "latencyMs": int(avg_lat_ms) if avg_lat_ms else 0,
+                        "winRate": win_rate,
+                        "lastActive": last_active_str,
+                        "status": status,
+                        "rank": rank,
+                        "contextWindow": spec["contextWindow"],
+                        "description": spec["description"]
+                    })
+
+                return {
+                    "isGuest": clerk_id == "guest",
+                    "hasData": total_user_assistant_msgs > 0,
+                    "totalCalls": total_user_assistant_msgs,
+                    "benchmarks": benchmarks
+                }
     except Exception as e:
-        logger.error(f"Failed to fetch agent performance: {e}")
-        return {"benchmarks": []}
+        logger.error(f"Failed to fetch agent performance metrics: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to load performance metrics: {str(e)}"
+        )
 
 @app.websocket("/ws/chat")
 async def websocket_endpoint(websocket: WebSocket):
