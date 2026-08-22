@@ -32,7 +32,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
   const { conversationId } = useParams<{ conversationId?: string }>();
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
-  const { remaining: localRemaining } = useUsage();
+  const { usage, remaining: localRemaining } = useUsage();
 
   const [prompt, setPrompt] = useState("");
   const [provider, setProvider] = useState<string>("gemini");
@@ -62,7 +62,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
     setUserTier(nextTier);
     toast({
       title: `Tier Switched to ${nextTier.toUpperCase()}`,
-      description: nextTier === "pro" ? "All Domain Councils Unlocked & Unlimited Queries!" : "Free Tier Active (10 Queries/Day)",
+      description: nextTier === "pro" ? "All Domain Councils Unlocked & Unlimited Queries!" : "Free Tier Active (30 Queries/Day)",
     });
     fetch("/api/user/toggle-tier", { method: "POST" }).catch(() => {});
   };
@@ -85,7 +85,9 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
           if (data.messages && data.messages.length > 0) {
             setMessages(data.messages);
           }
-          if (data.title) setConversationTitle(data.title);
+          if (data.title && data.title.length > 25) {
+            setConversationTitle(data.title);
+          }
         })
         .catch((err) => {
           console.error("Failed to load conversation:", err);
@@ -95,6 +97,20 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
         });
     }
   }, [conversationId]);
+
+  // Dynamically set long header title from the first user prompt
+  useEffect(() => {
+    if (messages.length > 0) {
+      const firstUserMsg = messages.find((m) => m.role === "user");
+      if (firstUserMsg && firstUserMsg.content) {
+        const cleanPrompt = firstUserMsg.content.trim().replace(/\n/g, " ");
+        const words = cleanPrompt.split(/\s+/);
+        const titleText = words.slice(0, 10).join(" ").toUpperCase();
+        const finalTitle = titleText.length > 60 ? titleText.slice(0, 57) + "..." : titleText;
+        setConversationTitle(`"${finalTitle}"`);
+      }
+    }
+  }, [messages]);
 
   // Auto-send prompt if launched from LandingPage
   useEffect(() => {
@@ -121,6 +137,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
     activeStances,
     conflictAnalysis: liveConflictAnalysis,
     remaining: wsRemaining,
+    limit: wsLimit,
     sendMessage,
   } = useWebSocket({
     onDebateComplete: (fullText, conflictData, returnedConvId) => {
@@ -168,6 +185,11 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
     if (!prompt.trim() || isStreaming) return;
 
     const userPrompt = prompt.trim();
+    if (conversationTitle === "NEW DISCUSSION" || conversationTitle === "NEW CONVERSATION") {
+      const displayTitle = userPrompt.length > 50 ? userPrompt.slice(0, 47) + "..." : userPrompt;
+      setConversationTitle(`"${displayTitle.toUpperCase()}"`);
+    }
+
     setMessages((prev) => [
       ...prev,
       {
@@ -191,6 +213,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const dailyLimit = wsLimit !== null && wsLimit !== undefined ? wsLimit : (usage?.dailyQueryLimit || 30);
   const remainingQueries = wsRemaining !== null ? wsRemaining : localRemaining;
 
   // Custom code renderer for ReactMarkdown
@@ -199,13 +222,13 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
       const match = /language-(\w+)/.exec(className || "");
       return !inline && match ? (
         <div className="my-3 border-2 border-[#333] rounded-xl overflow-hidden shadow-[2px_2px_0px_#000]">
-          <div className="bg-[#14141A] px-4 py-2 border-b border-[#333] flex justify-between items-center text-[10px] text-muted-foreground font-mono">
+          <div className="bg-[#14141A] px-4 py-2 border-b border-[#333] flex justify-between items-center text-xs text-muted-foreground font-mono">
             <span>{match[1].toUpperCase()}</span>
             <button
               onClick={() => copyToClipboard(String(children).replace(/\n$/, ""), String(children))}
               className="hover:text-primary transition-colors flex items-center gap-1 cursor-pointer"
             >
-              <Copy size={12} /> Copy
+              <Copy size={13} /> Copy
             </button>
           </div>
           <SyntaxHighlighter
@@ -219,7 +242,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
           </SyntaxHighlighter>
         </div>
       ) : (
-        <code className="bg-[#08080B] px-1.5 py-0.5 rounded border border-[#333] text-[#00FFB3] font-mono text-xs" {...props}>
+        <code className="bg-[#08080B] px-1.5 py-0.5 rounded border border-[#333] text-[#00FFB3] font-mono text-xs md:text-sm" {...props}>
           {children}
         </code>
       );
@@ -242,7 +265,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
               <div className="h-[3px] bg-[#00FFB3] w-full rounded-full"></div>
             </div>
           </button>
-          <h2 className="font-display text-[11px] text-[#00FFB3] tracking-widest mt-1 flex items-center gap-1 truncate">
+          <h2 className="font-display text-xs text-[#00FFB3] tracking-widest mt-1 flex items-center gap-1 truncate font-bold max-w-[min(65vw,650px)]">
             {conversationTitle.toUpperCase()}
             {isStreaming && (
               <motion.span
@@ -255,29 +278,29 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
           </h2>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-3 shrink-0 font-mono">
           <div
             onClick={handleToggleTier}
-            className={`border-2 rounded-full px-3 py-1 text-xs font-sans font-bold flex items-center gap-1 cursor-pointer transition-colors ${
+            className={`border-2 rounded-full px-3.5 py-1 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-colors ${
               userTier === "pro"
                 ? "border-amber-400 text-amber-300 bg-amber-400/10 hover:bg-amber-400/20"
                 : "border-secondary text-[#00C8FF] hover:bg-secondary/10"
             }`}
             data-testid="chat-header-query-counter"
           >
-            {userTier === "pro" ? "UNLIMITED ⚡" : `${remainingQueries} / 10 queries ⚡`}
+            {userTier === "pro" ? "UNLIMITED ⚡" : `${remainingQueries} / ${dailyLimit} queries ⚡`}
           </div>
 
-          <div className="relative flex items-center justify-center w-2 h-2">
+          <div className="relative flex items-center justify-center w-2.5 h-2.5">
             <motion.div
-              className={`absolute w-2 h-2 rounded-full ${
+              className={`absolute w-2.5 h-2.5 rounded-full ${
                 status === "Connected" ? "bg-[#00FF95]" : "bg-[#FF4FD8]"
               }`}
               animate={{ scale: [1, 2, 1], opacity: [1, 0, 1] }}
               transition={{ repeat: Infinity, duration: 2 }}
             />
             <div
-              className={`w-2 h-2 rounded-full relative z-10 ${
+              className={`w-2.5 h-2.5 rounded-full relative z-10 ${
                 status === "Connected" ? "bg-[#00FF95]" : "bg-[#FF4FD8]"
               }`}
             />
@@ -286,16 +309,16 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
       </header>
 
       {/* MESSAGES / CHAT CONTAINER */}
-      <main className="flex-1 flex flex-col relative overflow-y-auto custom-scrollbar p-6 bg-[#08080B]">
+      <main className="flex-1 flex flex-col relative overflow-y-auto custom-scrollbar p-6 lg:p-8 bg-[#08080B]">
 
         {isLoadingHistory ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-4">
             <div className="w-12 h-12 border-4 border-[#00C8FF] border-t-transparent rounded-full animate-spin"></div>
-            <p className="font-display text-[9px] text-[#00C8FF] tracking-widest uppercase">Loading Council Logs...</p>
+            <p className="font-display text-xs text-[#00C8FF] tracking-widest uppercase">Loading Council Logs...</p>
           </div>
         ) : messages.length === 0 ? (
           /* EMPTY STATE */
-          <div className="flex-1 flex flex-col items-center justify-center text-center max-w-xl mx-auto py-8">
+          <div className="flex-1 flex flex-col items-center justify-center text-center max-w-2xl mx-auto py-8">
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -304,30 +327,30 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
             >
               🏛️
             </motion.div>
-            <h1 className="font-display text-base text-foreground mb-3 tracking-widest">
+            <h1 className="font-display text-lg text-foreground mb-3 tracking-widest font-bold">
               MULTI-AGENT COUNCIL STANDBY
             </h1>
-            <p className="text-muted-foreground text-xs leading-relaxed mb-6 font-sans">
+            <p className="text-slate-300 text-sm leading-relaxed mb-6 font-sans">
               Select a domain council above or use ✨ Auto-Detect, submit your question, and watch 3 specialized AI agents debate in parallel before synthesizing a final verdict.
             </p>
           </div>
         ) : (
-          /* MESSAGE LIST */
-          <div className="flex flex-col gap-6 max-w-3xl w-full mx-auto">
+          /* MESSAGE LIST WITH WIDER RESPONSIVE LAYOUT */
+          <div className="flex flex-col gap-6 max-w-[min(92vw,1150px)] w-full mx-auto">
             {messages.map((msg) => {
               const isUser = msg.role === "user";
               return (
                 <div key={msg.id} className="flex flex-col w-full">
                   <div
-                    className={`flex flex-col max-w-[85%] rounded-2xl border-2 p-4 transition-shadow relative ${
+                    className={`flex flex-col max-w-[90%] rounded-2xl border-2 p-5 lg:p-6 transition-shadow relative ${
                       isUser
                         ? "self-end border-[#00C8FF] bg-[#00C8FF]/5 text-[#E0F7FF] shadow-[3px_3px_0px_rgba(0,200,255,0.2)]"
                         : "self-start border-[#00FFB3] bg-[#00FFB3]/5 text-[#E0FFF6] shadow-[3px_3px_0px_rgba(0,255,179,0.2)]"
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
                       <span
-                        className={`font-display text-[9px] uppercase tracking-wider ${
+                        className={`font-mono text-xs font-bold uppercase tracking-wider ${
                           isUser ? "text-[#00C8FF]" : "text-[#00FFB3]"
                         }`}
                       >
@@ -338,11 +361,11 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
                           onClick={() => copyToClipboard(msg.content, msg.id)}
                           className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                         >
-                          {copiedId === msg.id ? <Check size={12} className="text-[#00FFB3]" /> : <Copy size={12} />}
+                          {copiedId === msg.id ? <Check size={14} className="text-[#00FFB3]" /> : <Copy size={14} />}
                         </button>
                       )}
                     </div>
-                    <div className="prose prose-invert max-w-none text-xs font-sans leading-relaxed break-words">
+                    <div className="prose prose-invert max-w-none text-sm md:text-base font-sans leading-relaxed break-words">
                       {isUser ? (
                         <p className="whitespace-pre-wrap">{msg.content}</p>
                       ) : (
@@ -362,45 +385,45 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
 
             {/* LIVE DEBATE BUBBLE & THINKING ANIMATION */}
             {isStreaming && (
-              <div className="flex flex-col max-w-[90%] rounded-2xl border-2 border-[#FF4FD8] bg-[#FF4FD8]/10 text-[#FFEAF9] shadow-[0_0_20px_rgba(255,79,216,0.25)] p-5 self-start w-full transition-all">
+              <div className="flex flex-col max-w-full rounded-2xl border-2 border-[#FF4FD8] bg-[#FF4FD8]/10 text-[#FFEAF9] shadow-[0_0_20px_rgba(255,79,216,0.25)] p-6 self-start w-full transition-all">
                 <div className="flex items-center justify-between mb-3 border-b border-[#FF4FD8]/30 pb-2">
-                  <span className="font-mono text-xs text-[#FF4FD8] uppercase tracking-wider flex items-center gap-2 font-bold">
-                    <Sparkles size={14} className="animate-spin text-[#00FFB3]" /> 
+                  <span className="font-mono text-xs md:text-sm text-[#FF4FD8] uppercase tracking-wider flex items-center gap-2 font-bold">
+                    <Sparkles size={16} className="animate-spin text-[#00FFB3]" /> 
                     {streamedContent ? "SYNTHESIZING MULTI-AGENT VERDICT..." : "COUNCIL IS THINKING & EVALUATING..."}
                   </span>
-                  <span className="text-[10px] font-mono text-[#00FFB3] bg-[#00FFB3]/10 px-2 py-0.5 rounded border border-[#00FFB3]/30 animate-pulse">
+                  <span className="text-xs font-mono text-[#00FFB3] bg-[#00FFB3]/10 px-2.5 py-1 rounded border border-[#00FFB3]/30 animate-pulse font-bold">
                     {status || "CLASSIFYING & QUERYING"}
                   </span>
                 </div>
 
                 {/* THINKING ANIMATION STATE */}
                 {!streamedContent && activeStances.length === 0 && (
-                  <div className="py-4 flex flex-col items-center justify-center gap-3 text-center">
+                  <div className="py-6 flex flex-col items-center justify-center gap-3 text-center">
                     <div className="flex items-center gap-3">
-                      <div className="w-3 h-3 bg-[#00C8FF] rounded-full animate-ping"></div>
-                      <div className="w-3 h-3 bg-[#00FFB3] rounded-full animate-ping" style={{ animationDelay: "200ms" }}></div>
-                      <div className="w-3 h-3 bg-[#FF4FD8] rounded-full animate-ping" style={{ animationDelay: "400ms" }}></div>
+                      <div className="w-3.5 h-3.5 bg-[#00C8FF] rounded-full animate-ping"></div>
+                      <div className="w-3.5 h-3.5 bg-[#00FFB3] rounded-full animate-ping" style={{ animationDelay: "200ms" }}></div>
+                      <div className="w-3.5 h-3.5 bg-[#FF4FD8] rounded-full animate-ping" style={{ animationDelay: "400ms" }}></div>
                     </div>
-                    <p className="font-mono text-xs text-slate-300">
+                    <p className="font-mono text-xs md:text-sm text-slate-300">
                       Querying 3 Council Personas in parallel (<span className="text-[#00C8FF]">Fact-Checker</span>, <span className="text-[#00FFB3]">Optimist</span>, <span className="text-[#FF4FD8]">Skeptic</span>)...
                     </p>
                   </div>
                 )}
 
                 {activeStances.length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
                     {activeStances.map((s) => (
-                      <div key={s.role_id} className="p-2.5 bg-slate-950/90 border border-slate-800 rounded-lg text-xs shadow-inner">
-                        <div className="font-bold text-slate-200 flex items-center gap-1.5 mb-1">
+                      <div key={s.role_id} className="p-3 bg-slate-950/90 border border-slate-800 rounded-xl text-xs md:text-sm shadow-inner space-y-1">
+                        <div className="font-bold text-slate-100 flex items-center gap-1.5 font-mono">
                           <span>{s.icon}</span> {s.role_name}
                         </div>
-                        <p className="text-[10px] text-slate-400 line-clamp-3 leading-relaxed">{s.content}</p>
+                        <p className="text-xs md:text-sm text-slate-300 line-clamp-4 leading-relaxed font-sans">{s.content}</p>
                       </div>
                     ))}
                   </div>
                 )}
 
-                <div className="prose prose-invert max-w-none text-xs font-sans leading-relaxed break-words">
+                <div className="prose prose-invert max-w-none text-sm md:text-base font-sans leading-relaxed break-words">
                   {streamedContent ? (
                     <ReactMarkdown remarkPlugins={[remarkGfm]} components={MarkdownComponents as any}>
                       {streamedContent}
@@ -420,7 +443,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
 
       {/* STATUS BAR */}
       {status !== "Connected" && status !== "Disconnected" && status !== "Idle" && (
-        <div className="bg-[#14141A] border-t border-b border-[#333] px-6 py-1.5 text-[10px] font-mono text-muted-foreground flex items-center gap-2">
+        <div className="bg-[#14141A] border-t border-b border-[#333] px-6 py-2 text-xs font-mono text-muted-foreground flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-[#00FFB3] animate-pulse shrink-0"></span>
           <span>COUNCIL ENGINE STATUS: {status.toUpperCase()}</span>
         </div>
@@ -428,7 +451,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
 
       {/* BOTTOM INPUT BAR */}
       <footer className="p-5 border-t-[3px] border-[#00C8FF] bg-[#0D0D12] shrink-0">
-        <div className="max-w-[900px] mx-auto flex flex-col gap-3">
+        <div className="max-w-[min(92vw,1150px)] mx-auto flex flex-col gap-3">
           <form onSubmit={handleSend} className="flex gap-3">
             <div className="flex-1 flex bg-[#08080B] border-[3px] border-primary rounded-xl min-h-[56px] shadow-[4px_4px_0px_#00FFB3] focus-within:shadow-[6px_6px_0px_#00FFB3] transition-shadow">
               <input

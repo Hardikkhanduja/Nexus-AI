@@ -241,12 +241,12 @@ async def generate_conversation_title(conversation_id: str, current_user: dict =
                 if not row or not row[0]:
                     return {"title": "New Discussion"}
                 
-                first_prompt = row[0].strip()
-                # Extract clean 3-5 word concise title
-                words = first_prompt.replace("\n", " ").split()
-                clean_title = " ".join(words[:4]).upper()
-                if len(clean_title) > 35:
-                    clean_title = clean_title[:32] + "..."
+                first_prompt = row[0].strip().replace("\n", " ")
+                # Extract clean 8-10 word concise title (up to 65 chars)
+                words = first_prompt.split()
+                clean_title = " ".join(words[:10]).upper()
+                if len(clean_title) > 65:
+                    clean_title = clean_title[:62] + "..."
 
                 cur.execute(
                     "UPDATE conversations SET title = %s, updated_at = NOW() WHERE id = %s",

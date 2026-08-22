@@ -142,3 +142,57 @@
     );
   }
 }
+
+/* GLOBAL CYBERPUNK DARK SCROLLBAR DESIGN SYSTEM */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #242436 #0D0D12;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #08080B;
+  border-left: 1px solid #1A1A24;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #242436;
+  border-radius: 4px;
+  border: 1px solid #333348;
+  transition: all 0.2s ease-in-out;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #00FFB3;
+  box-shadow: 0 0 8px #00FFB3;
+}
+
+::-webkit-scrollbar-corner {
+  background: #08080B;
+}
+
+/* Custom scrollbar utility class */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #08080B;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #242436;
+  border-radius: 4px;
+  border: 1px solid #00C8FF/30;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #00C8FF;
+  box-shadow: 0 0 8px #00C8FF;
+}
+
