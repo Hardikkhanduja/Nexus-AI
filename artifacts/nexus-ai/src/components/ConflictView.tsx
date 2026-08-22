@@ -69,7 +69,7 @@ export const ConflictView: React.FC<ConflictViewProps> = ({ conflictAnalysis }) 
                 <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider block mb-0.5 flex items-center gap-1">
                   Synthesizer Judge Core Verdict
                 </span>
-                <p className="text-xs leading-relaxed text-indigo-100 font-medium">{verdict}</p>
+                <p className="text-sm leading-relaxed text-indigo-100 font-medium">{verdict}</p>
               </div>
             </div>
           )}
@@ -83,7 +83,7 @@ export const ConflictView: React.FC<ConflictViewProps> = ({ conflictAnalysis }) 
               </div>
               <ul className="space-y-1.5">
                 {agreements.map((item, idx) => (
-                  <li key={idx} className="text-xs text-emerald-200/90 flex items-start gap-2">
+                  <li key={idx} className="text-sm text-emerald-200/90 flex items-start gap-2">
                     <span className="text-emerald-500 font-bold">•</span>
                     <span>{item}</span>
                   </li>
@@ -98,7 +98,7 @@ export const ConflictView: React.FC<ConflictViewProps> = ({ conflictAnalysis }) 
               </div>
               <ul className="space-y-1.5">
                 {disagreements.map((item, idx) => (
-                  <li key={idx} className="text-xs text-rose-200/90 flex items-start gap-2">
+                  <li key={idx} className="text-sm text-rose-200/90 flex items-start gap-2">
                     <span className="text-rose-500 font-bold">•</span>
                     <span>{item}</span>
                   </li>
@@ -168,7 +168,7 @@ export const ConflictView: React.FC<ConflictViewProps> = ({ conflictAnalysis }) 
                             </span>
                           </div>
                         </div>
-                        <div className="whitespace-pre-wrap leading-relaxed font-sans text-slate-200">
+                        <div className="whitespace-pre-wrap leading-relaxed font-sans text-slate-200 text-sm">
                           {agent.content}
                         </div>
                       </TabsContent>

@@ -47,19 +47,20 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   // Dynamic system items based on auth state
   const bottomItems = [
+    { icon: Gauge, label: "Usage & Limits", path: "/usage" },
     ...(isAuthenticated 
       ? [
-          { icon: User, label: "Profile", path: "/profile" },
-          { icon: Gauge, label: "Usage & Limits", path: "/usage" },
-          { icon: Settings, label: "Settings", path: "/settings" }
+          { icon: User, label: "Profile", path: "/profile" }
         ]
-      : [
-          { icon: LogIn, label: "Login", path: "/login" },
-          { icon: Gauge, label: "Usage & Limits", path: "/usage" }
-        ]
+      : []
     ),
-    { icon: BookOpen, label: "Documentation", path: "/docs" },
-    { icon: MessageCircle, label: "Feedback", path: "/feedback" }
+    { icon: MessageCircle, label: "Feedback", path: "/feedback" },
+    ...(!isAuthenticated
+      ? [
+          { icon: LogIn, label: "Login", path: "/login" }
+        ]
+      : []
+    )
   ];
 
   const handleLogout = () => {

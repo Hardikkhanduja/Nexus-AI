@@ -14,7 +14,6 @@ import HistoryPage from "@/pages/HistoryPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
 import PerformancePage from "@/pages/PerformancePage";
 import SavedPage from "@/pages/SavedPage";
-import DocsPage from "@/pages/DocsPage";
 import FeedbackPage from "@/pages/FeedbackPage";
 import LoginPage from "@/pages/LoginPage";
 import SignUpPage from "@/pages/SignUpPage";
@@ -100,9 +99,6 @@ function AppRouter() {
           </Route>
           <Route path="/usage">
             <UsagePage onOpenSidebar={openSidebar} />
-          </Route>
-          <Route path="/docs">
-            <DocsPage onOpenSidebar={openSidebar} />
           </Route>
           <Route path="/feedback">
             <FeedbackPage onOpenSidebar={openSidebar} />

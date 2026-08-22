@@ -67,35 +67,39 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
     fetch("/api/user/toggle-tier", { method: "POST" }).catch(() => {});
   };
 
-  // Load conversation history on mount or when conversationId changes
+  // Load conversation history or reset workspace on conversationId changes
   useEffect(() => {
-    if (conversationId && messages.length === 0) {
-      setIsLoadingHistory(true);
-      const token = localStorage.getItem("nexus_token") || localStorage.getItem("clerk_session");
-      fetch(`/api/ai/conversations/${conversationId}`, {
-        headers: {
-          Authorization: token ? `Bearer ${token}` : "",
-        },
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error("Failed to load conversation");
-          return res.json();
-        })
-        .then((data) => {
-          if (data.messages && data.messages.length > 0) {
-            setMessages(data.messages);
-          }
-          if (data.title && data.title.length > 25) {
-            setConversationTitle(data.title);
-          }
-        })
-        .catch((err) => {
-          console.error("Failed to load conversation:", err);
-        })
-        .finally(() => {
-          setIsLoadingHistory(false);
-        });
+    if (!conversationId) {
+      setMessages([]);
+      setConversationTitle("NEW DISCUSSION");
+      return;
     }
+
+    setIsLoadingHistory(true);
+    const token = localStorage.getItem("nexus_token") || localStorage.getItem("clerk_session");
+    fetch(`/api/ai/conversations/${conversationId}`, {
+      headers: {
+        Authorization: token ? `Bearer ${token}` : "",
+      },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to load conversation");
+        return res.json();
+      })
+      .then((data) => {
+        if (data.messages && data.messages.length > 0) {
+          setMessages(data.messages);
+        }
+        if (data.title && data.title.length > 25) {
+          setConversationTitle(data.title);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load conversation:", err);
+      })
+      .finally(() => {
+        setIsLoadingHistory(false);
+      });
   }, [conversationId]);
 
   // Dynamically set long header title from the first user prompt
@@ -365,7 +369,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
                         </button>
                       )}
                     </div>
-                    <div className="prose prose-invert max-w-none text-sm md:text-base font-sans leading-relaxed break-words">
+                    <div className="prose prose-invert max-w-none text-xs font-sans leading-relaxed break-words prose-p:text-sm prose-li:text-sm prose-td:text-sm prose-th:text-sm prose-blockquote:text-sm">
                       {isUser ? (
                         <p className="whitespace-pre-wrap">{msg.content}</p>
                       ) : (
@@ -423,7 +427,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
                   </div>
                 )}
 
-                <div className="prose prose-invert max-w-none text-sm md:text-base font-sans leading-relaxed break-words">
+                <div className="prose prose-invert max-w-none text-xs font-sans leading-relaxed break-words prose-p:text-sm prose-li:text-sm prose-td:text-sm prose-th:text-sm prose-blockquote:text-sm">
                   {streamedContent ? (
                     <ReactMarkdown remarkPlugins={[remarkGfm]} components={MarkdownComponents as any}>
                       {streamedContent}
