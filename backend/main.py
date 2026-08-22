@@ -82,7 +82,11 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
     if not user_info:
         return {"id": None, "clerk_id": "guest", "tier": "free"}
         
-    return get_or_create_user(user_info)
+    try:
+        return get_or_create_user(user_info)
+    except Exception as e:
+        logger.warning(f"Database user lookup failed, falling back to guest tier: {e}")
+        return {"id": None, "clerk_id": user_info.get("sub", "guest"), "tier": "free"}
 
 @app.get("/health")
 def health_check():
