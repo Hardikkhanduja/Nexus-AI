@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUser } from "@clerk/clerk-react";
 import { useUsage } from "@/hooks/useUsage";
 import { 
   PlusCircle, MessageSquare, BarChart2, Activity, Bookmark, 
@@ -22,13 +23,21 @@ const mainItems = [
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [location, setLocation] = useLocation();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user: localUser, isAuthenticated: localIsAuth, logout: localLogout } = useAuth();
+  const { user: clerkUser, isSignedIn: clerkIsSignedIn } = useUser();
   const { usage } = useUsage();
   const [recentConversations, setRecentConversations] = useState<{ id: string; title: string }[]>([]);
 
+  const isAuthenticated = localIsAuth || Boolean(clerkIsSignedIn);
+  const user = localUser || (clerkUser ? {
+    name: clerkUser.fullName || clerkUser.username || "Agent",
+    email: clerkUser.primaryEmailAddress?.emailAddress || "",
+    avatarUrl: clerkUser.imageUrl
+  } : null);
+
   useEffect(() => {
     if (isOpen && isAuthenticated) {
-      const token = localStorage.getItem("nexus_token");
+      const token = localStorage.getItem("nexus_token") || localStorage.getItem("clerk_session");
       fetch("/api/ai/conversations", {
         headers: {
           "Authorization": token ? `Bearer ${token}` : "",
@@ -48,12 +57,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   // Dynamic system items based on auth state
   const bottomItems = [
     { icon: Gauge, label: "Usage & Limits", path: "/usage" },
-    ...(isAuthenticated 
-      ? [
-          { icon: User, label: "Profile", path: "/profile" }
-        ]
-      : []
-    ),
     { icon: MessageCircle, label: "Feedback", path: "/feedback" },
     ...(!isAuthenticated
       ? [
@@ -64,7 +67,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   ];
 
   const handleLogout = () => {
-    logout();
+    localLogout();
+    if (clerkIsSignedIn && (window as any).Clerk) {
+      try {
+        (window as any).Clerk.signOut();
+      } catch {}
+    }
     onClose();
     setLocation("/");
   };
