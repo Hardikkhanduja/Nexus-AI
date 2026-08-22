@@ -65,7 +65,7 @@ async function apiFetch(path: string, options: RequestInit = {}): Promise<Respon
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
-  return fetch(`${API_BASE}${path}`, { ...options, headers, credentials: "include" });
+  return fetch(`${API_BASE}${path}`, { ...options, headers });
 }
 
 // ─── Provider ──────────────────────────────────────────────────
