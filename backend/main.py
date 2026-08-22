@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv(override=True)
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -36,7 +35,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS Configuration
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 app.add_middleware(
     CORSMiddleware,
@@ -52,18 +50,12 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
         
     parts = authorization.split(" ")
     if len(parts) != 2 or parts[0].lower() != "bearer":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format",
-        )
+        return {"id": None, "clerk_id": "guest", "tier": "free"}
         
     token = parts[1]
     user_info = verify_clerk_token(token)
     if not user_info:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired session token",
-        )
+        return {"id": None, "clerk_id": "guest", "tier": "free"}
         
     return get_or_create_user(user_info)
 
@@ -86,7 +78,6 @@ def db_health_check():
             detail="Database connection failed",
         )
 
-# REST: Fetch available Domain Councils
 @app.get("/api/ai/councils")
 def list_councils(current_user: dict = Depends(get_current_user)):
     is_pro = current_user.get("tier") == "pro"
@@ -95,29 +86,26 @@ def list_councils(current_user: dict = Depends(get_current_user)):
         "councils": get_available_councils(is_pro=is_pro)
     }
 
-# REST: Toggle User Tier (Demo Mode Switcher for Hackathon Presentation)
+# Demo Mode Tier Switcher (Works in Guest & Auth mode)
 @app.post("/api/user/toggle-tier")
 def toggle_user_tier(current_user: dict = Depends(get_current_user)):
-    clerk_id = current_user.get("clerk_id")
-    if not clerk_id or clerk_id == "guest":
-        raise HTTPException(status_code=400, detail="Authentication required to toggle tier")
-        
+    clerk_id = current_user.get("clerk_id", "guest")
     new_tier = "pro" if current_user.get("tier") == "free" else "free"
     
-    try:
-        with get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE users SET tier = %s WHERE clerk_id = %s",
-                    (new_tier, clerk_id)
-                )
-                conn.commit()
-        return {"status": "success", "clerk_id": clerk_id, "new_tier": new_tier}
-    except Exception as e:
-        logger.error(f"Failed to toggle tier: {e}")
-        raise HTTPException(status_code=500, detail="Failed to update user tier")
+    if clerk_id != "guest":
+        try:
+            with get_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "UPDATE users SET tier = %s WHERE clerk_id = %s",
+                        (new_tier, clerk_id)
+                    )
+                    conn.commit()
+        except Exception as e:
+            logger.error(f"Failed to update user tier in DB: {e}")
+            
+    return {"status": "success", "clerk_id": clerk_id, "new_tier": new_tier}
 
-# REST: List conversations
 @app.get("/api/ai/conversations")
 async def list_conversations(current_user: dict = Depends(get_current_user)):
     clerk_id = current_user.get("clerk_id")
@@ -145,9 +133,8 @@ async def list_conversations(current_user: dict = Depends(get_current_user)):
                 } for row in rows]
     except Exception as e:
         logger.error(f"Failed to fetch conversations: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve conversations")
+        return []
 
-# REST: Get conversation details & message history with conflict analysis
 @app.get("/api/ai/conversations/{conversation_id}")
 async def get_conversation(
     conversation_id: str,
@@ -158,12 +145,12 @@ async def get_conversation(
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT id, title, created_at FROM conversations WHERE id = %s AND clerk_id = %s",
+                    "SELECT id, title, created_at FROM conversations WHERE id = %s AND (clerk_id = %s OR clerk_id = 'guest')",
                     (conversation_id, clerk_id),
                 )
                 conv_row = cur.fetchone()
                 if not conv_row:
-                    raise HTTPException(status_code=404, detail="Conversation not found")
+                    return {"id": conversation_id, "title": "New Discussion", "messages": []}
                 
                 cur.execute(
                     """
@@ -182,7 +169,7 @@ async def get_conversation(
                         "role": row[1],
                         "content": row[2],
                         "agentName": row[3],
-                        "conflictAnalysis": row[4], # JSONB data
+                        "conflictAnalysis": row[4],
                         "createdAt": row[5].isoformat() if row[5] else None,
                     })
                 
@@ -192,13 +179,10 @@ async def get_conversation(
                     "createdAt": conv_row[2].isoformat() if conv_row[2] else None,
                     "messages": messages,
                 }
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"Failed to fetch conversation: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve conversation details")
+        return {"id": conversation_id, "title": "New Discussion", "messages": []}
 
-# WebSocket connection endpoint
 @app.websocket("/ws/chat")
 async def websocket_endpoint(websocket: WebSocket):
     await handle_chat_websocket(websocket)

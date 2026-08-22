@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, Link } from "wouter";
-import { useAuth } from "@/contexts/AuthContext";
+import { SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
 import { useUsage } from "@/hooks/useUsage";
 
 interface LandingPageProps {
@@ -19,7 +19,6 @@ const agents = [
 
 export default function LandingPage({ onOpenSidebar }: LandingPageProps) {
   const [, setLocation] = useLocation();
-  const { user, isAuthenticated } = useAuth();
   const { remaining } = useUsage();
   const [query, setQuery] = useState("");
   const [isFocused, setIsFocused] = useState(false);
@@ -36,7 +35,7 @@ export default function LandingPage({ onOpenSidebar }: LandingPageProps) {
       {/* HAMBURGER */}
       <button 
         onClick={onOpenSidebar}
-        className="absolute top-6 left-6 p-2.5 bg-background border-2 border-primary/50 rounded-lg transition-all hover:border-primary hover:shadow-[2px_2px_0px_#00FFB3] group z-20"
+        className="absolute top-6 left-6 p-2.5 bg-background border-2 border-primary/50 rounded-lg transition-all hover:border-primary hover:shadow-[2px_2px_0px_#00FFB3] group z-20 cursor-pointer"
         data-testid="button-open-sidebar"
       >
         <div className="flex flex-col gap-[4px] w-[28px]">
@@ -46,22 +45,15 @@ export default function LandingPage({ onOpenSidebar }: LandingPageProps) {
         </div>
       </button>
 
-      {/* USER PROFILE IN TOP-RIGHT */}
-      <div className="absolute top-6 right-6 z-20">
-        {isAuthenticated && user ? (
-          <Link href="/profile">
-            <button 
-              className="w-12 h-12 rounded-full border-2 border-[#00FFB3] shadow-[0_0_10px_rgba(0,255,179,0.3)] overflow-hidden flex items-center justify-center bg-[#14141A] transition-all hover:scale-105 cursor-pointer"
-              data-testid="header-avatar"
-            >
-              {user.avatarUrl ? (
-                <img src={user.avatarUrl} alt={user.name || "Avatar"} className="w-full h-full object-cover" />
-              ) : (
-                <div className="font-display text-xs text-[#00FFB3]">{user.name?.slice(0, 1).toUpperCase() || "?"}</div>
-              )}
-            </button>
-          </Link>
-        ) : (
+      {/* CLERK USER PROFILE AVATAR IN TOP-RIGHT */}
+      <div className="absolute top-6 right-6 z-20 flex items-center gap-3">
+        <SignedIn>
+          <div className="p-0.5 border-2 border-[#00FFB3] rounded-full shadow-[0_0_10px_rgba(0,255,179,0.4)]">
+            <UserButton afterSignOutUrl="/" />
+          </div>
+        </SignedIn>
+
+        <SignedOut>
           <Link href="/login">
             <button 
               className="px-4 py-2 border-2 border-[#FF4FD8] text-[#FF4FD8] rounded-lg font-sans font-bold text-xs bg-background transition-all hover:bg-[#FF4FD8]/10 hover:shadow-[2px_2px_0px_#FF4FD8] active:translate-y-[1px] cursor-pointer"
@@ -70,7 +62,7 @@ export default function LandingPage({ onOpenSidebar }: LandingPageProps) {
               LOGIN ⚡
             </button>
           </Link>
-        )}
+        </SignedOut>
       </div>
 
       <motion.div
@@ -91,7 +83,7 @@ export default function LandingPage({ onOpenSidebar }: LandingPageProps) {
             ⚡
           </motion.span>
         </h1>
-        <p className="font-sans text-xs text-[#00C8FF] tracking-widest mt-6 font-bold">
+        <p className="font-sans text-xs text-[#00C8FF] tracking-widest mt-6 font-bold uppercase">
           MULTI-AGENT INTELLIGENCE PLATFORM
         </p>
       </motion.div>
@@ -120,7 +112,7 @@ export default function LandingPage({ onOpenSidebar }: LandingPageProps) {
           />
           <button 
             type="submit"
-            className="bg-[#00FFB3] text-[#0B0B0E] font-sans font-bold px-6 py-4 rounded-r-lg border-l-[3px] border-[#00FFB3] transition-all active:translate-y-[2px] hover:bg-[#00FFB3]/90 flex items-center gap-2"
+            className="bg-[#00FFB3] text-[#0B0B0E] font-sans font-bold px-6 py-4 rounded-r-lg border-l-[3px] border-[#00FFB3] transition-all active:translate-y-[2px] hover:bg-[#00FFB3]/90 flex items-center gap-2 cursor-pointer"
             data-testid="button-launch"
           >
             LAUNCH ⚡

@@ -9,6 +9,7 @@ const port = Number(rawPort);
 const basePath = process.env.BASE_PATH || "/";
 
 export default defineConfig({
+  envDir: path.resolve(import.meta.dirname, "../.."),
   base: basePath,
   plugins: [
     react(),

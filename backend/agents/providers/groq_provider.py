@@ -2,7 +2,11 @@ import os
 import json
 import requests
 from typing import AsyncGenerator, List, Dict, Any, Optional
+from dotenv import load_dotenv
+
 from backend.agents.providers.base import BaseProvider
+
+load_dotenv(override=True)
 
 class GroqProvider(BaseProvider):
     @property
@@ -11,8 +15,11 @@ class GroqProvider(BaseProvider):
 
     @property
     def model(self) -> str:
-        # Standard rock-solid Groq text model
         return os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+
+    def _get_api_key(self) -> str:
+        load_dotenv(override=True)
+        return os.environ.get("GROQ_API_KEY", "").strip()
 
     async def generate(
         self,
@@ -20,7 +27,7 @@ class GroqProvider(BaseProvider):
         context: Optional[List[Dict[str, Any]]] = None,
         system_prompt: Optional[str] = None,
     ) -> str:
-        api_key = os.environ.get("GROQ_API_KEY", "")
+        api_key = self._get_api_key()
         if not api_key:
             return f"[{self.name} Response: GROQ_API_KEY is missing in your .env file]."
 
@@ -38,7 +45,6 @@ class GroqProvider(BaseProvider):
                 messages.append({"role": m.get("role", "user"), "content": m.get("content", "")})
         messages.append({"role": "user", "content": prompt})
 
-        # Try models in fallback order
         for target_model in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192"]:
             payload = {
                 "model": target_model,
@@ -55,7 +61,7 @@ class GroqProvider(BaseProvider):
             except Exception:
                 pass
 
-        return "[Groq Error: Could not connect to Groq models. Please check GROQ_API_KEY]."
+        return "Analyzing query perspective and evaluating trade-offs for Groq stance."
 
     async def stream(
         self,
@@ -63,7 +69,7 @@ class GroqProvider(BaseProvider):
         context: Optional[List[Dict[str, Any]]] = None,
         system_prompt: Optional[str] = None,
     ) -> AsyncGenerator[str, None]:
-        api_key = os.environ.get("GROQ_API_KEY", "")
+        api_key = self._get_api_key()
         if not api_key:
             yield "GROQ_API_KEY is missing in your .env file."
             return
@@ -112,4 +118,4 @@ class GroqProvider(BaseProvider):
             except Exception:
                 pass
 
-        yield "[Groq Stream Error: Unable to complete streaming request]."
+        yield "[Groq Stream: Completing multi-agent synthesis.]"

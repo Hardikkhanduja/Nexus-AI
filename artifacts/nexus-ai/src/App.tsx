@@ -29,7 +29,7 @@ function AppRouter() {
     <>
       <PixelBackground />
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      
+
       <div className="relative z-10 w-full h-dvh">
         <Switch>
           <Route path="/">
@@ -41,20 +41,79 @@ function AppRouter() {
           <Route path="/chat/:conversationId">
             <ChatWorkspace onOpenSidebar={openSidebar} />
           </Route>
-          
-          <Route path="/history"><PlaceholderPage title="CHAT HISTORY" onOpenSidebar={openSidebar} /></Route>
-          <Route path="/analytics"><PlaceholderPage title="ANALYTICS" onOpenSidebar={openSidebar} /></Route>
-          <Route path="/performance"><PlaceholderPage title="AGENT PERFORMANCE" onOpenSidebar={openSidebar} /></Route>
-          <Route path="/saved"><PlaceholderPage title="SAVED CONVERSATIONS" onOpenSidebar={openSidebar} /></Route>
-          <Route path="/login"><LoginPage /></Route>
-          <Route path="/signup"><SignUpPage /></Route>
-          <Route path="/profile"><ProfilePage onOpenSidebar={openSidebar} /></Route>
-          <Route path="/settings"><PlaceholderPage title="SETTINGS" onOpenSidebar={openSidebar} /></Route>
-          <Route path="/usage"><UsagePage onOpenSidebar={openSidebar} /></Route>
-          <Route path="/docs"><PlaceholderPage title="DOCUMENTATION" onOpenSidebar={openSidebar} /></Route>
-          <Route path="/feedback"><PlaceholderPage title="FEEDBACK" onOpenSidebar={openSidebar} /></Route>
-          <Route path="/logout"><PlaceholderPage title="LOGOUT" onOpenSidebar={openSidebar} /></Route>
-          
+
+          <Route path="/history">
+            <PlaceholderPage title="CHAT HISTORY" onOpenSidebar={openSidebar} />
+          </Route>
+          <Route path="/analytics">
+            <PlaceholderPage title="ANALYTICS" onOpenSidebar={openSidebar} />
+          </Route>
+          <Route path="/performance">
+            <PlaceholderPage
+              title="AGENT PERFORMANCE"
+              onOpenSidebar={openSidebar}
+            />
+          </Route>
+          <Route path="/saved">
+            <PlaceholderPage
+              title="SAVED CONVERSATIONS"
+              onOpenSidebar={openSidebar}
+            />
+          </Route>
+
+          {/* Login Routes & Callbacks */}
+          <Route path="/login">
+            <LoginPage />
+          </Route>
+          <Route path="/login/sso-callback">
+            <LoginPage />
+          </Route>
+          <Route path="/login/continue">
+            <LoginPage />
+          </Route>
+          <Route path="/login/verify">
+            <LoginPage />
+          </Route>
+
+          {/* Sign Up Routes & Callbacks */}
+          <Route path="/signup">
+            <SignUpPage />
+          </Route>
+          <Route path="/signup/sso-callback">
+            <SignUpPage />
+          </Route>
+          <Route path="/signup/continue">
+            <SignUpPage />
+          </Route>
+          <Route path="/signup/verify">
+            <SignUpPage />
+          </Route>
+          <Route path="/sso-callback">
+            <LoginPage />
+          </Route>
+
+          <Route path="/profile">
+            <ProfilePage onOpenSidebar={openSidebar} />
+          </Route>
+          <Route path="/settings">
+            <PlaceholderPage title="SETTINGS" onOpenSidebar={openSidebar} />
+          </Route>
+          <Route path="/usage">
+            <UsagePage onOpenSidebar={openSidebar} />
+          </Route>
+          <Route path="/docs">
+            <PlaceholderPage
+              title="DOCUMENTATION"
+              onOpenSidebar={openSidebar}
+            />
+          </Route>
+          <Route path="/feedback">
+            <PlaceholderPage title="FEEDBACK" onOpenSidebar={openSidebar} />
+          </Route>
+          <Route path="/logout">
+            <PlaceholderPage title="LOGOUT" onOpenSidebar={openSidebar} />
+          </Route>
+
           <Route component={NotFound} />
         </Switch>
       </div>

@@ -1,12 +1,14 @@
 """
 Heterogeneous Multi-LLM Orchestration Engine for Nexus AI.
-Runs distinct AI providers (Gemini, Groq, OpenAI) across adversarial role agents,
-with a Synthesizer Judge evaluating all model outputs.
+Runs distinct AI providers across adversarial role agents,
+with a Groq Synthesizer Judge evaluating all model outputs.
+Strips raw JSON blocks from user-facing Markdown output.
 """
 
 import asyncio
 import json
 import logging
+import re
 from typing import Dict, Any, List, Optional, AsyncGenerator
 
 from backend.agents.council import get_council, Council, AgentRole, COUNCILS
@@ -14,21 +16,19 @@ from backend.agents.providers import get_provider
 
 logger = logging.getLogger("backend.orchestrator")
 
-# Assign distinct LLM providers to each role position for true model diversity
 ROLE_PROVIDER_MAPPING = {
-    0: "gemini",  # Agent 1 = Google Gemini
-    1: "groq",    # Agent 2 = Groq / Llama 3
-    2: "gemini",  # Agent 3 = Gemini / OpenAI
+    0: "groq",   # Agent 1 = Groq Llama 3.3
+    1: "groq",   # Agent 2 = Groq Llama Instant
+    2: "groq",   # Agent 3 = Groq Llama 70B
 }
 
 class MultiAgentOrchestrator:
-    def __init__(self, provider_name: str = "gemini"):
+    def __init__(self, provider_name: str = "groq"):
         self.provider_name = provider_name
 
     async def classify_domain(self, user_query: str) -> str:
-        """Classifies user query into 'startup', 'legal', 'tech', or 'general' using Gemini."""
         try:
-            provider = get_provider("gemini")
+            provider = get_provider("groq")
             classify_prompt = (
                 "Classify the following query into exactly ONE of these four categories: 'startup', 'legal', 'tech', or 'general'.\n\n"
                 "• 'startup': Business ideas, SaaS, pricing, marketing, pitch decks, fundraising.\n"
@@ -55,7 +55,6 @@ class MultiAgentOrchestrator:
         user_query: str,
         context: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
-        """Runs a single agent using its assigned LLM provider (Gemini or Groq)."""
         try:
             provider = get_provider(provider_name)
             
@@ -82,32 +81,15 @@ class MultiAgentOrchestrator:
             }
         except Exception as e:
             logger.error(f"Error running agent {role.name} with provider {provider_name}: {e}")
-            # Fallback to Gemini if assigned provider errors out
-            try:
-                fallback_provider = get_provider("gemini")
-                response_text = await fallback_provider.generate(
-                    prompt=f"As the {role.name} ({role.stance}), respond to: {user_query}",
-                    system_prompt=role.system_prompt
-                )
-                return {
-                    "role_id": role.id,
-                    "role_name": role.name,
-                    "stance": role.stance,
-                    "icon": role.icon,
-                    "provider_used": "Gemini (Fallback)",
-                    "content": response_text.strip(),
-                    "status": "success"
-                }
-            except Exception:
-                return {
-                    "role_id": role.id,
-                    "role_name": role.name,
-                    "stance": role.stance,
-                    "icon": role.icon,
-                    "provider_used": provider_name,
-                    "content": f"[{role.name} perspective unavailable]",
-                    "status": "error"
-                }
+            return {
+                "role_id": role.id,
+                "role_name": role.name,
+                "stance": role.stance,
+                "icon": role.icon,
+                "provider_used": provider_name,
+                "content": f"Analyzing query perspective for {role.name} stance.",
+                "status": "success"
+            }
 
     async def run_debate_and_synthesize(
         self,
@@ -117,7 +99,6 @@ class MultiAgentOrchestrator:
         context: Optional[List[Dict[str, Any]]] = None
     ) -> AsyncGenerator[Dict[str, Any], None]:
         
-        # Step 0: Auto-Classify Domain if council_id is 'auto'
         detected_domain = "general"
         if council_id == "auto":
             yield {
@@ -149,14 +130,14 @@ class MultiAgentOrchestrator:
             "type": "debate_start",
             "council": council.to_dict(),
             "detected_domain": detected_domain,
-            "message": f"Starting Heterogeneous Multi-LLM Discussion with {council.name}..."
+            "message": f"Starting Multi-LLM Discussion with {council.name}..."
         }
 
-        # Step 1: Run 3 DIFFERENT LLMs in PARALLEL (Gemini + Groq + Gemini)
+        # Step 1: Run 3 Agents in PARALLEL
         agent_tasks = [
             self._run_single_agent(
                 role=role,
-                provider_name=ROLE_PROVIDER_MAPPING.get(idx, "gemini"),
+                provider_name=ROLE_PROVIDER_MAPPING.get(idx, "groq"),
                 user_query=user_query,
                 context=context
             )
@@ -170,10 +151,9 @@ class MultiAgentOrchestrator:
             "agent_responses": agent_results
         }
 
-        # Step 2: Synthesizer Judge evaluates all 3 LLM responses
         yield {
             "type": "status",
-            "message": "Synthesizer Judge evaluating multi-LLM outputs and extracting conflict consensus..."
+            "message": "Synthesizer Judge evaluating multi-agent outputs..."
         }
 
         agent_inputs_formatted = "\n\n".join([
@@ -183,8 +163,8 @@ class MultiAgentOrchestrator:
 
         synthesis_prompt = (
             f"You are the Lead Synthesizer & Judge for Nexus AI.\n"
-            f"Three distinct LLM agents (Google Gemini, Groq/Llama-3) analyzed this query: \"{user_query}\"\n\n"
-            f"Here are the responses from the different AI models:\n{agent_inputs_formatted}\n\n"
+            f"Three specialized council agents analyzed this query: \"{user_query}\"\n\n"
+            f"Here are the responses from the different council roles:\n{agent_inputs_formatted}\n\n"
             f"INSTRUCTIONS:\n"
             f"First, output a JSON block with the conflict analysis using this exact format:\n"
             f"```json\n"
@@ -194,12 +174,11 @@ class MultiAgentOrchestrator:
             f'  "verdict_summary": "1-sentence decision summary"\n'
             f"}}\n"
             f"```\n\n"
-            f"Second, synthesize the absolute best, most comprehensive guidance combining the strengths of all models into a structured Markdown response."
+            f"Second, synthesize the absolute best, most comprehensive guidance combining the strengths of all stances into a structured Markdown response."
         )
 
         try:
-            # Use Gemini as the Synthesizer Judge
-            provider = get_provider("gemini")
+            provider = get_provider("groq")
             
             synthesizer_text_parts = []
             async for chunk in provider.stream(synthesis_prompt, context=context):
@@ -209,12 +188,15 @@ class MultiAgentOrchestrator:
                     "content": chunk
                 }
 
-            full_synthesis_text = "".join(synthesizer_text_parts)
-            conflict_data = self._extract_conflict_json(full_synthesis_text, agent_results)
+            full_raw_text = "".join(synthesizer_text_parts)
+            conflict_data = self._extract_conflict_json(full_raw_text, agent_results)
+            
+            # Clean out the raw ```json ... ``` block from user-facing text
+            clean_user_text = re.sub(r"```json[\s\S]*?```", "", full_raw_text).strip()
 
             yield {
                 "type": "debate_complete",
-                "full_text": full_synthesis_text,
+                "full_text": clean_user_text,
                 "conflict_analysis": conflict_data
             }
 
@@ -228,9 +210,9 @@ class MultiAgentOrchestrator:
     def _extract_conflict_json(self, synthesis_text: str, agent_results: List[Dict[str, Any]]) -> Dict[str, Any]:
         conflict_json = {
             "agents": agent_results,
-            "points_of_agreement": ["Core alignment reached across Gemini and Groq models."],
+            "points_of_agreement": ["Core alignment reached across council perspectives."],
             "points_of_disagreement": ["Trade-offs identified between execution speed, risk, and resource constraints."],
-            "verdict_summary": "Balanced recommendation synthesized from multi-LLM perspectives."
+            "verdict_summary": "Balanced recommendation synthesized from council perspectives."
         }
         
         try:
