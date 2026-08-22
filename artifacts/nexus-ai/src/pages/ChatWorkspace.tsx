@@ -109,9 +109,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
           content: userPrompt,
         },
       ]);
-      setTimeout(() => {
-        sendMessage(userPrompt, undefined, provider, selectedCouncilId);
-      }, 400);
+      sendMessage(userPrompt, undefined, provider, selectedCouncilId);
     }
   }, [conversationId, provider, selectedCouncilId]);
 

@@ -293,124 +293,225 @@ async def get_user_usage_endpoint(current_user: dict = Depends(get_current_user)
 
 @app.get("/api/ai/analytics")
 async def get_analytics_metrics(current_user: dict = Depends(get_current_user)):
-    """Fetch live real-time analytics telemetry from PostgreSQL database."""
-    clerk_id = current_user.get("clerk_id")
+    """Fetch user-scoped real-time analytics telemetry strictly from database queries."""
+    clerk_id = current_user.get("clerk_id") or "guest"
+
     try:
         with get_connection() as conn:
             with conn.cursor() as cur:
-                # 1. Total conversations & query count
-                cur.execute("SELECT COUNT(*) FROM conversations")
+                # 1. Total conversations & query count for THIS user
+                cur.execute("SELECT COUNT(*) FROM conversations WHERE clerk_id = %s", (clerk_id,))
                 total_conversations = cur.fetchone()[0] or 0
 
-                cur.execute("SELECT COUNT(*) FROM messages WHERE role = 'user'")
+                cur.execute(
+                    """
+                    SELECT COUNT(*) FROM messages 
+                    WHERE conversation_id IN (SELECT id FROM conversations WHERE clerk_id = %s)
+                    AND role = 'user'
+                    """,
+                    (clerk_id,),
+                )
                 total_queries = cur.fetchone()[0] or 0
 
-                # 2. Persona Disagreement Rate (% where personas disagreed)
-                cur.execute("SELECT COUNT(*) FROM messages WHERE conflict_analysis IS NOT NULL")
-                analyzed_count = cur.fetchone()[0] or 0
-                disagreement_rate = "42.8%" if total_queries > 0 else "0.0%"
+                cur.execute(
+                    """
+                    SELECT COUNT(*) FROM messages 
+                    WHERE conversation_id IN (SELECT id FROM conversations WHERE clerk_id = %s)
+                    AND role = 'assistant'
+                    """,
+                    (clerk_id,),
+                )
+                total_assistant_msgs = cur.fetchone()[0] or 0
 
-                # 3. Fallback Events count
-                fallback_events_count = 3  # Fallback logging hook counter
+                # 2. Persona Disagreement Rate (% where conflict_analysis is populated and contains disagreements)
+                cur.execute(
+                    """
+                    SELECT COUNT(*) FROM messages 
+                    WHERE conversation_id IN (SELECT id FROM conversations WHERE clerk_id = %s)
+                    AND role = 'assistant'
+                    AND conflict_analysis IS NOT NULL 
+                    AND conflict_analysis::text NOT IN ('', '{}', 'null', '[]')
+                    """,
+                    (clerk_id,),
+                )
+                disagreement_count = cur.fetchone()[0] or 0
+                disagreement_rate = f"{(disagreement_count / total_assistant_msgs * 100):.1f}%" if total_assistant_msgs > 0 else "0.0%"
 
-                # 4. Provider Reliability Metrics
-                provider_reliability = [
-                    {"provider": "Groq (Llama 3.3)", "latencyMs": 280, "fallbacks": 0, "successRate": 99.8, "status": "Optimal", "color": "#00FFB3"},
-                    {"provider": "Google Gemini 2.0", "latencyMs": 650, "fallbacks": 1, "successRate": 98.4, "status": "Optimal", "color": "#00C8FF"},
-                    {"provider": "Anthropic Claude 3.5", "latencyMs": 1120, "fallbacks": 0, "successRate": 99.2, "status": "Active", "color": "#FF4FD8"},
-                    {"provider": "OpenAI GPT-4o Mini", "latencyMs": 950, "fallbacks": 1, "successRate": 97.5, "status": "Active", "color": "#F59E0B"},
-                    {"provider": "DeepSeek R1", "latencyMs": 1450, "fallbacks": 2, "successRate": 94.1, "status": "Weak Link", "color": "#8B5CF6"},
-                    {"provider": "Perplexity Sonar", "latencyMs": 1200, "fallbacks": 0, "successRate": 98.0, "status": "Active", "color": "#10B981"},
+                # 3. Fallback Events count for THIS user
+                cur.execute(
+                    """
+                    SELECT COUNT(*) FROM messages 
+                    WHERE conversation_id IN (SELECT id FROM conversations WHERE clerk_id = %s)
+                    AND was_fallback = true
+                    """,
+                    (clerk_id,),
+                )
+                fallback_events_count = cur.fetchone()[0] or 0
+
+                # 4. Average Latency & Sparkline per provider
+                cur.execute(
+                    """
+                    SELECT AVG(latency_ms) FROM messages 
+                    WHERE conversation_id IN (SELECT id FROM conversations WHERE clerk_id = %s)
+                    AND latency_ms IS NOT NULL
+                    """,
+                    (clerk_id,),
+                )
+                raw_avg_val = cur.fetchone()[0]
+                avg_latency_val = float(raw_avg_val) if raw_avg_val is not None else None
+                avg_latency_str = f"{(avg_latency_val / 1000.0):.2f}s" if avg_latency_val is not None else "N/A"
+
+                cur.execute(
+                    """
+                    SELECT provider, AVG(latency_ms) 
+                    FROM messages 
+                    WHERE conversation_id IN (SELECT id FROM conversations WHERE clerk_id = %s)
+                    AND provider IS NOT NULL AND latency_ms IS NOT NULL
+                    GROUP BY provider
+                    """,
+                    (clerk_id,),
+                )
+                sparkline_rows = cur.fetchall()
+                provider_latency_sparkline = [
+                    {
+                        "name": r[0].capitalize(),
+                        "latency": f"{(float(r[1]) / 1000.0):.2f}s" if r[1] is not None else "0.00s",
+                        "ms": int(float(r[1])) if r[1] is not None else 0,
+                        "color": "#00FFB3" if "groq" in r[0].lower() else "#00C8FF" if "gemini" in r[0].lower() else "#FF4FD8"
+                    }
+                    for r in sparkline_rows
                 ]
 
-                # 5. 7-Day Volume by Category
-                cur.execute("""
-                    SELECT DATE(created_at) as day_date, COUNT(*) 
+                # 5. Provider Reliability Matrix (from real user messages)
+                cur.execute(
+                    """
+                    SELECT provider, COUNT(*), SUM(CASE WHEN was_fallback THEN 1 ELSE 0 END), AVG(latency_ms)
                     FROM messages 
-                    WHERE role = 'user' 
+                    WHERE conversation_id IN (SELECT id FROM conversations WHERE clerk_id = %s)
+                    AND provider IS NOT NULL
+                    GROUP BY provider
+                    """,
+                    (clerk_id,),
+                )
+                rel_rows = cur.fetchall()
+                provider_reliability = []
+                for r in rel_rows:
+                    total_cnt = float(r[1] or 1)
+                    fallback_cnt = float(r[2] or 0)
+                    avg_lat = float(r[3]) if r[3] is not None else 0.0
+                    provider_reliability.append({
+                        "provider": r[0].upper(),
+                        "latencyMs": int(avg_lat),
+                        "fallbacks": int(fallback_cnt),
+                        "successRate": round(100.0 - (fallback_cnt / total_cnt * 100.0), 1),
+                        "status": "Optimal" if fallback_cnt == 0 else "Active",
+                        "color": "#00FFB3"
+                    })
+
+                # 6. 7-Day Volume by Category for THIS user
+                cur.execute(
+                    """
+                    SELECT DATE(created_at) as day_date, category, COUNT(*) 
+                    FROM messages 
+                    WHERE conversation_id IN (SELECT id FROM conversations WHERE clerk_id = %s)
+                    AND role = 'user' 
                     AND created_at >= NOW() - INTERVAL '7 days'
-                    GROUP BY DATE(created_at) 
+                    GROUP BY DATE(created_at), category
                     ORDER BY day_date ASC
-                """)
+                    """,
+                    (clerk_id,),
+                )
                 volume_rows = cur.fetchall()
-                volume_data = []
+                volume_by_day = {}
                 for r in volume_rows:
                     day_str = r[0].strftime("%a") if r[0] else "Day"
-                    volume_data.append({
-                        "day": day_str,
-                        "queries": r[1],
-                        "coding": max(1, int(r[1] * 0.35)),
-                        "business": max(1, int(r[1] * 0.28)),
-                        "research": max(1, int(r[1] * 0.22)),
-                        "creative": max(1, int(r[1] * 0.15))
-                    })
+                    if day_str not in volume_by_day:
+                        volume_by_day[day_str] = {"day": day_str, "queries": 0}
+                    volume_by_day[day_str]["queries"] += r[2]
+                    cat_key = (r[1] or "general").split("_")[0]
+                    volume_by_day[day_str][cat_key] = volume_by_day[day_str].get(cat_key, 0) + r[2]
 
-                if not volume_data:
-                    volume_data = [
-                        {"day": "Mon", "queries": 24, "coding": 9, "business": 7, "research": 5, "creative": 3},
-                        {"day": "Tue", "queries": 35, "coding": 12, "business": 10, "research": 8, "creative": 5},
-                        {"day": "Wed", "queries": 48, "coding": 18, "business": 14, "research": 10, "creative": 6},
-                        {"day": "Thu", "queries": 62, "coding": 22, "business": 18, "research": 14, "creative": 8},
-                        {"day": "Fri", "queries": 89, "coding": 32, "business": 25, "research": 20, "creative": 12},
-                        {"day": "Sat", "queries": 110, "coding": 42, "business": 32, "research": 24, "creative": 12},
-                        {"day": "Sun", "queries": 142, "coding": 52, "business": 40, "research": 30, "creative": 20},
-                    ]
+                volume_data = list(volume_by_day.values())
 
-                # 6. Actual 13 Category Distribution
+                # 7. Category Distribution for THIS user
+                cur.execute(
+                    """
+                    SELECT category, COUNT(*) 
+                    FROM messages 
+                    WHERE conversation_id IN (SELECT id FROM conversations WHERE clerk_id = %s)
+                    AND category IS NOT NULL
+                    GROUP BY category
+                    ORDER BY COUNT(*) DESC
+                    """,
+                    (clerk_id,),
+                )
+                cat_rows = cur.fetchall()
+                colors = ["#00FFB3", "#00C8FF", "#FF4FD8", "#F59E0B", "#8B5CF6", "#10B981"]
                 category_distribution = [
-                    {"name": "Coding & Programming", "value": 35, "color": "#00FFB3"},
-                    {"name": "Business & Strategy", "value": 24, "color": "#00C8FF"},
-                    {"name": "Research & Fact Finding", "value": 16, "color": "#FF4FD8"},
-                    {"name": "Science & Engineering", "value": 10, "color": "#F59E0B"},
-                    {"name": "Mathematics & Logic", "value": 8, "color": "#8B5CF6"},
-                    {"name": "Creative Writing", "value": 7, "color": "#10B981"}
+                    {
+                        "name": r[0].replace("_", " ").title(),
+                        "value": r[1],
+                        "color": colors[i % len(colors)]
+                    }
+                    for i, r in enumerate(cat_rows)
                 ]
 
-                # 7. Persona Model Assignments (Fact-Checker, Optimist, Skeptic)
+                # 8. Persona Model Assignments for THIS user
+                cur.execute(
+                    """
+                    SELECT persona_role, provider, COUNT(*), SUM(CASE WHEN was_fallback THEN 1 ELSE 0 END)
+                    FROM messages 
+                    WHERE conversation_id IN (SELECT id FROM conversations WHERE clerk_id = %s)
+                    AND persona_role IS NOT NULL
+                    GROUP BY persona_role, provider
+                    """,
+                    (clerk_id,),
+                )
+                persona_rows = cur.fetchall()
                 persona_assignments = [
-                    {"persona": "Fact-Checker 🔵", "model": "Google Gemini 2.0", "primaryUses": 124, "fallbacks": 2, "color": "#00C8FF"},
-                    {"persona": "Optimist 🟢", "model": "Groq Llama 3.3", "primaryUses": 140, "fallbacks": 0, "color": "#00FFB3"},
-                    {"persona": "Skeptic 🔴", "model": "Anthropic Claude 3.5", "primaryUses": 98, "fallbacks": 1, "color": "#FF4FD8"},
+                    {
+                        "persona": r[0].replace("_", " ").title(),
+                        "model": r[1].upper() if r[1] else "Auto",
+                        "primaryUses": r[2],
+                        "fallbacks": int(r[3]) if r[3] else 0,
+                        "color": "#00C8FF" if "fact" in r[0].lower() else "#00FFB3" if "opt" in r[0].lower() else "#FF4FD8"
+                    }
+                    for r in persona_rows
                 ]
 
-                # 8. Live Activity Feed (Last 10-15 conversations)
-                cur.execute("""
-                    SELECT id, title, created_at 
-                    FROM conversations 
-                    ORDER BY created_at DESC 
+                # 9. Real Activity Feed for THIS user
+                cur.execute(
+                    """
+                    SELECT c.id, c.title, c.updated_at,
+                           (SELECT m.category FROM messages m WHERE m.conversation_id = c.id AND m.category IS NOT NULL LIMIT 1) as cat
+                    FROM conversations c
+                    WHERE c.clerk_id = %s
+                    ORDER BY c.updated_at DESC
                     LIMIT 12
-                """)
+                    """,
+                    (clerk_id,),
+                )
                 recent_convs = cur.fetchall()
-                activity_feed = []
-                categories = ["Coding & Tech", "Business Strategy", "Legal Compliance", "General Debate", "Science & Research"]
-                for i, r in enumerate(recent_convs):
-                    activity_feed.append({
+                activity_feed = [
+                    {
                         "id": r[0],
-                        "category": categories[i % len(categories)],
+                        "title": r[1] or "Discussion",
+                        "category": (r[3] or "General").replace("_", " ").title(),
                         "timestamp": r[2].strftime("%I:%M:%S %p") if r[2] else "Just now",
                         "status": "Synthesized Verdict"
-                    })
-
-                if not activity_feed:
-                    activity_feed = [
-                        {"id": "act_1", "category": "Coding & Tech", "timestamp": "Just now", "status": "Synthesized Verdict"},
-                        {"id": "act_2", "category": "Business Strategy", "timestamp": "2 mins ago", "status": "Synthesized Verdict"},
-                        {"id": "act_3", "category": "Legal Compliance", "timestamp": "5 mins ago", "status": "Synthesized Verdict"},
-                        {"id": "act_4", "category": "Science & Research", "timestamp": "12 mins ago", "status": "Synthesized Verdict"}
-                    ]
+                    }
+                    for r in recent_convs
+                ]
 
                 return {
+                    "isGuest": False,
+                    "hasData": total_conversations > 0 or total_queries > 0,
                     "totalConversations": total_conversations,
                     "totalQueries": total_queries,
                     "disagreementRate": disagreement_rate,
                     "fallbackEventsThisWeek": fallback_events_count,
-                    "avgLatency": "0.85s",
-                    "providerLatencySparkline": [
-                        {"name": "Groq", "latency": "0.28s", "ms": 280, "color": "#00FFB3"},
-                        {"name": "Gemini", "latency": "0.65s", "ms": 650, "color": "#00C8FF"},
-                        {"name": "Claude", "latency": "1.12s", "ms": 1120, "color": "#FF4FD8"},
-                        {"name": "GPT-4o", "latency": "0.95s", "ms": 950, "color": "#F59E0B"}
-                    ],
+                    "avgLatency": avg_latency_str,
+                    "providerLatencySparkline": provider_latency_sparkline,
                     "providerReliability": provider_reliability,
                     "volumeData": volume_data,
                     "categoryDistribution": category_distribution,
@@ -418,23 +519,11 @@ async def get_analytics_metrics(current_user: dict = Depends(get_current_user)):
                     "activityFeed": activity_feed
                 }
     except Exception as e:
-        logger.error(f"Failed to fetch analytics: {e}")
-        return {
-            "totalConversations": 1,
-            "totalQueries": 1,
-            "disagreementRate": "42.8%",
-            "fallbackEventsThisWeek": 3,
-            "avgLatency": "0.85s",
-            "providerLatencySparkline": [
-                {"name": "Groq", "latency": "0.28s", "ms": 280, "color": "#00FFB3"},
-                {"name": "Gemini", "latency": "0.65s", "ms": 650, "color": "#00C8FF"}
-            ],
-            "providerReliability": [],
-            "volumeData": [{"day": "Today", "queries": 1, "coding": 1}],
-            "categoryDistribution": [{"name": "Coding & Programming", "value": 100, "color": "#00FFB3"}],
-            "personaAssignments": [],
-            "activityFeed": []
-        }
+        logger.error(f"Failed to fetch user analytics: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to load analytics: {str(e)}"
+        )
 
 @app.get("/api/ai/performance")
 async def get_agent_performance_metrics(current_user: dict = Depends(get_current_user)):

@@ -19,6 +19,29 @@ logger = logging.getLogger(__name__)
 _pool: psycopg2.pool.SimpleConnectionPool | None = None
 
 
+def init_db_migrations() -> None:
+    """Ensure all required analytics columns exist in messages table."""
+    if _pool is None:
+        return
+    try:
+        conn = _pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    ALTER TABLE messages ADD COLUMN IF NOT EXISTS category VARCHAR(100);
+                    ALTER TABLE messages ADD COLUMN IF NOT EXISTS persona_role VARCHAR(50);
+                    ALTER TABLE messages ADD COLUMN IF NOT EXISTS provider VARCHAR(50);
+                    ALTER TABLE messages ADD COLUMN IF NOT EXISTS latency_ms INTEGER;
+                    ALTER TABLE messages ADD COLUMN IF NOT EXISTS was_fallback BOOLEAN DEFAULT FALSE;
+                    ALTER TABLE messages ADD COLUMN IF NOT EXISTS conflict_analysis TEXT;
+                """)
+                conn.commit()
+                logger.info("Database migrations applied successfully (messages schema updated).")
+        finally:
+            _pool.putconn(conn)
+    except Exception as e:
+        logger.warning(f"Failed to apply DB migrations: {e}")
+
 def init_pool() -> None:
     """Initialize the connection pool. Call once at app startup."""
     global _pool
@@ -35,6 +58,7 @@ def init_pool() -> None:
             dsn=database_url,
         )
         logger.info("Database connection pool initialized.")
+        init_db_migrations()
     except Exception as exc:
         logger.warning(f"Database connection pool unavailable: {exc}")
         _pool = None

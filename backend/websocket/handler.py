@@ -35,8 +35,10 @@ async def handle_chat_websocket(websocket: WebSocket):
             user_db_record = get_or_create_user(user_info)
             logger.info(f"Authenticated user: {user_db_record.get('email')} (Tier: {user_db_record.get('tier')})")
         else:
+            user_db_record = get_or_create_user({"clerk_id": "guest", "email": "guest@nexus.ai", "name": "Guest User", "username": "guest"})
             logger.info("Unverified token; operating in guest mode.")
     else:
+        user_db_record = get_or_create_user({"clerk_id": "guest", "email": "guest@nexus.ai", "name": "Guest User", "username": "guest"})
         logger.info("Guest WebSocket connection connected.")
 
     user_tier = user_db_record.get("tier", "free")
@@ -139,43 +141,50 @@ async def handle_chat_websocket(websocket: WebSocket):
                     conversation_id = str(uuid.uuid4())
 
             # 6. Execute Multi-Agent Orchestration
+            import time
+            start_time = time.time()
             orchestrator = MultiAgentOrchestrator(primary_provider=provider_name)
             final_synthesis_text = ""
             conflict_analysis_data = {}
+            detected_category = "general_knowledge"
 
             async for event in orchestrator.run_debate_and_synthesize(
                 user_query=sanitized_content,
                 council_id=council_id
             ):
                 event["conversationId"] = conversation_id
+                if event.get("category"):
+                    detected_category = event.get("category")
                 await websocket.send_json(event)
                 
                 if event.get("type") == "debate_complete":
                     final_synthesis_text = event.get("full_text", "")
                     conflict_analysis_data = event.get("conflict_analysis", {})
 
-            # 7. Persist User Message & Assistant Response with JSONB Conflict Data
+            latency_ms = int((time.time() - start_time) * 1000)
+
+            # 7. Persist User Message & Assistant Response with real analytics metrics
             if user_id and final_synthesis_text:
                 try:
                     user_msg_id = str(uuid.uuid4())
                     assistant_msg_id = str(uuid.uuid4())
                     with get_connection() as conn:
                         with conn.cursor() as cur:
-                            # Save user query
+                            # Save user query with detected category
                             cur.execute(
                                 """
-                                INSERT INTO messages (id, conversation_id, role, content, agent_name, created_at)
-                                VALUES (%s, %s, 'user', %s, 'User', NOW())
+                                INSERT INTO messages (id, conversation_id, role, content, agent_name, category, created_at)
+                                VALUES (%s, %s, 'user', %s, 'User', %s, NOW())
                                 """,
-                                (user_msg_id, conversation_id, sanitized_content),
+                                (user_msg_id, conversation_id, sanitized_content, detected_category),
                             )
-                            # Save synthesized response with JSONB conflict analysis
+                            # Save synthesized response with role, provider, latency, and conflict analysis
                             cur.execute(
                                 """
-                                INSERT INTO messages (id, conversation_id, role, content, agent_name, conflict_analysis, created_at)
-                                VALUES (%s, %s, 'assistant', %s, 'Nexus Synthesizer', %s, NOW())
+                                INSERT INTO messages (id, conversation_id, role, content, agent_name, category, persona_role, provider, latency_ms, was_fallback, conflict_analysis, created_at)
+                                VALUES (%s, %s, 'assistant', %s, 'Nexus Synthesizer', %s, 'synthesizer', %s, %s, false, %s, NOW())
                                 """,
-                                (assistant_msg_id, conversation_id, final_synthesis_text, json.dumps(conflict_analysis_data)),
+                                (assistant_msg_id, conversation_id, final_synthesis_text, detected_category, provider_name, latency_ms, json.dumps(conflict_analysis_data)),
                             )
                             # Update conversation timestamp
                             cur.execute(

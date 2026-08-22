@@ -37,7 +37,7 @@ export function useWebSocket(options?: UseWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectDelayRef = useRef<number>(1000);
-  const maxReconnectDelay = 30000;
+  const pendingMessageRef = useRef<any>(null);
 
   const optionsRef = useRef(options);
   useEffect(() => {
@@ -71,6 +71,25 @@ export function useWebSocket(options?: UseWebSocketOptions) {
       }
       reconnectDelayRef.current = 1000;
       setError(null);
+
+      // Auto-flush queued message if sent while connecting
+      if (pendingMessageRef.current) {
+        const pending = pendingMessageRef.current;
+        pendingMessageRef.current = null;
+        try {
+          ws.send(
+            JSON.stringify({
+              type: "user_message",
+              content: pending.content,
+              conversationId: pending.conversationId,
+              provider: pending.provider,
+              councilId: pending.councilId,
+            })
+          );
+        } catch (e) {
+          console.error("Failed to send queued message:", e);
+        }
+      }
     };
 
     ws.onmessage = (event) => {
@@ -166,28 +185,36 @@ export function useWebSocket(options?: UseWebSocketOptions) {
   }, [connect]);
 
   const sendMessage = useCallback((content: string, conversationId?: string, provider: string = "groq", councilId: string = "general") => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      setError("Cannot send message. WebSocket is not connected.");
-      return false;
-    }
-
     setError(null);
     setStreamedContent("");
     setActiveStances([]);
     setConflictAnalysis(null);
     setIsStreaming(true);
 
-    wsRef.current.send(
-      JSON.stringify({
-        type: "user_message",
-        content,
-        conversationId,
-        provider,
-        councilId,
-      })
-    );
+    const messagePayload = { content, conversationId, provider, councilId };
 
-    return true;
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      // Queue message to send as soon as WebSocket connects
+      pendingMessageRef.current = messagePayload;
+      return true;
+    }
+
+    try {
+      wsRef.current.send(
+        JSON.stringify({
+          type: "user_message",
+          content,
+          conversationId,
+          provider,
+          councilId,
+        })
+      );
+      return true;
+    } catch (err) {
+      console.error("Error sending WebSocket message:", err);
+      pendingMessageRef.current = messagePayload;
+      return false;
+    }
   }, []);
 
   return {
