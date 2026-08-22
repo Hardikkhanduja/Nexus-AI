@@ -19,6 +19,9 @@ services:
     env: static
     buildCommand: cd artifacts/nexus-ai && npm install && npm run build
     staticPublishPath: ./artifacts/nexus-ai/dist/public
+    envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
     routes:
       - type: rewrite
         source: /*
