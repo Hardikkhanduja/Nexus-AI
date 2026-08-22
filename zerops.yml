@@ -14,9 +14,9 @@ zerops:
         - backend
     run:
       base: python@3.11
-      start: python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --ws auto --proxy-headers --forwarded-allow-ips='*'
+      start: python -m uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-80} --ws auto --proxy-headers --forwarded-allow-ips='*'
       envVariables:
-        PORT: "8000"
+        PORT: "80"
         PYTHONPATH: "."
 
   # 3. React Vite Static Frontend
