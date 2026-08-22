@@ -177,10 +177,10 @@ export default function UsagePage({ onOpenSidebar }: UsagePageProps) {
               {!isUserAuthenticated && (
                 <button
                   onClick={() => setLocation("/login")}
-                  className="px-5 py-3 bg-[#00FFB3] text-[#0D0D12] border-[3px] border-[#00FFB3] rounded-xl font-mono font-bold text-xs hover:bg-[#00FFB3]/90 shadow-[3px_3px_0px_#00C8FF] hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                  className="px-5 py-3 bg-[#00FFB3] text-[#0D0D12] border-[3px] border-[#00FFB3] rounded-xl font-mono font-bold text-xs hover:bg-[#00FFB3]/90 shadow-[3px_3px_0px_#00C8FF] hover:scale-105 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5"
                   data-testid="button-upgrade-register"
                 >
-                  Register to unlock 30 daily queries ⚡
+                  Register to unlock 30 daily queries <Zap className="w-3.5 h-3.5 fill-current inline" />
                 </button>
               )}
             </div>
@@ -228,7 +228,7 @@ export default function UsagePage({ onOpenSidebar }: UsagePageProps) {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono">
                 <div className="p-3 bg-[#14141A] border border-[#00C8FF]/40 rounded-xl flex items-center justify-between">
                   <div>
-                    <span className="text-xs text-[#00C8FF] font-bold block">Fact-Checker 🔵</span>
+                    <span className="text-xs text-[#00C8FF] font-bold block flex items-center gap-1">Fact-Checker <ShieldCheck className="w-3.5 h-3.5 text-[#00C8FF] inline" /></span>
                     <span className="text-xs text-slate-300">{queriesUsed} calls</span>
                   </div>
                   <div className="w-2.5 h-2.5 rounded-full bg-[#00C8FF] shadow-[0_0_8px_#00C8FF]" />
@@ -236,7 +236,7 @@ export default function UsagePage({ onOpenSidebar }: UsagePageProps) {
 
                 <div className="p-3 bg-[#14141A] border border-[#00FFB3]/40 rounded-xl flex items-center justify-between">
                   <div>
-                    <span className="text-xs text-[#00FFB3] font-bold block">Optimist 🟢</span>
+                    <span className="text-xs text-[#00FFB3] font-bold block flex items-center gap-1">Optimist <TrendingUp className="w-3.5 h-3.5 text-[#00FFB3] inline" /></span>
                     <span className="text-xs text-slate-300">{queriesUsed} calls</span>
                   </div>
                   <div className="w-2.5 h-2.5 rounded-full bg-[#00FFB3] shadow-[0_0_8px_#00FFB3]" />
@@ -244,7 +244,7 @@ export default function UsagePage({ onOpenSidebar }: UsagePageProps) {
 
                 <div className="p-3 bg-[#14141A] border border-[#FF4FD8]/40 rounded-xl flex items-center justify-between">
                   <div>
-                    <span className="text-xs text-[#FF4FD8] font-bold block">Skeptic 🔴</span>
+                    <span className="text-xs text-[#FF4FD8] font-bold block flex items-center gap-1">Skeptic <AlertTriangle className="w-3.5 h-3.5 text-[#FF4FD8] inline" /></span>
                     <span className="text-xs text-slate-300">{queriesUsed} calls</span>
                   </div>
                   <div className="w-2.5 h-2.5 rounded-full bg-[#FF4FD8] shadow-[0_0_8px_#FF4FD8]" />

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
 import { SignedIn, UserButton } from "@clerk/clerk-react";
+import { Bot, Brain, Sparkles, Search, Zap, Target, Edit3 } from "lucide-react";
 
 interface ProfilePageProps {
   onOpenSidebar: () => void;
@@ -11,12 +12,12 @@ interface ProfilePageProps {
 const codingLanguages = ["TypeScript", "JavaScript", "Python", "Rust", "Go", "C++", "Ruby", "Swift", "Java"];
 const writingStyles = ["Technical", "Concise", "Detailed", "Professional", "Casual", "Academic", "Creative"];
 const availableAgents = [
-  { name: "GPT", emoji: "🤖", color: "#00C8FF" },
-  { name: "Claude", emoji: "🧠", color: "#FF4FD8" },
-  { name: "Gemini", emoji: "✨", color: "#00FFB3" },
-  { name: "DeepSeek", emoji: "🔍", color: "#00C8FF" },
-  { name: "Mistral", emoji: "⚡", color: "#FF4FD8" },
-  { name: "Perplexity", emoji: "🎯", color: "#00FFB3" }
+  { name: "GPT", icon: Bot, color: "#00C8FF" },
+  { name: "Claude", icon: Brain, color: "#FF4FD8" },
+  { name: "Gemini", icon: Sparkles, color: "#00FFB3" },
+  { name: "DeepSeek", icon: Search, color: "#00C8FF" },
+  { name: "Mistral", icon: Zap, color: "#FF4FD8" },
+  { name: "Perplexity", icon: Target, color: "#00FFB3" }
 ];
 
 export default function ProfilePage({ onOpenSidebar }: ProfilePageProps) {
@@ -168,10 +169,10 @@ export default function ProfilePage({ onOpenSidebar }: ProfilePageProps) {
 
             <button
               onClick={handleEditClick}
-              className="px-4 py-2 border-2 border-[#00C8FF] text-[#00C8FF] font-sans font-bold text-xs rounded-lg hover:bg-[#00C8FF]/10 active:translate-y-[1px] transition-all"
+              className="px-4 py-2 border-2 border-[#00C8FF] text-[#00C8FF] font-sans font-bold text-xs rounded-lg hover:bg-[#00C8FF]/10 active:translate-y-[1px] transition-all flex items-center justify-center gap-1.5"
               data-testid="button-edit-profile"
             >
-              Edit Identity ⚡
+              Edit Identity <Edit3 className="w-3.5 h-3.5" />
             </button>
           </div>
 
@@ -260,6 +261,7 @@ export default function ProfilePage({ onOpenSidebar }: ProfilePageProps) {
             <div className="flex flex-wrap gap-4">
               {availableAgents.map((agent) => {
                 const isFav = preferences?.favoriteAgents?.includes(agent.name) || false;
+                const IconComponent = agent.icon;
                 return (
                   <motion.div
                     key={agent.name}
@@ -276,7 +278,7 @@ export default function ProfilePage({ onOpenSidebar }: ProfilePageProps) {
                     }}
                     data-testid={`profile-pill-agent-${agent.name.toLowerCase()}`}
                   >
-                    <span className="text-xl">{agent.emoji}</span>
+                    <IconComponent className="w-5 h-5" />
                     <span className="font-sans font-semibold text-sm">{agent.name}</span>
                     {isFav && <span className="ml-1 text-[#00FFB3] font-bold">✓</span>}
                   </motion.div>
@@ -335,11 +337,11 @@ export default function ProfilePage({ onOpenSidebar }: ProfilePageProps) {
                   <button
                     type="submit"
                     disabled={isUpdating}
-                    className="flex-1 bg-[#00FFB3] text-[#0D0D12] border-[3px] border-[#00FFB3] rounded-xl px-4 py-2.5 font-sans font-bold hover:bg-[#00FFB3]/90 active:translate-y-[2px] transition-all"
+                    className="flex-1 bg-[#00FFB3] text-[#0D0D12] border-[3px] border-[#00FFB3] rounded-xl px-4 py-2.5 font-sans font-bold hover:bg-[#00FFB3]/90 active:translate-y-[2px] transition-all flex items-center justify-center gap-1.5"
                     style={{ boxShadow: "3px 3px 0px #00C8FF" }}
                     data-testid="button-submit-edit-profile"
                   >
-                    {isUpdating ? "Saving..." : "Save Identity ⚡"}
+                    {isUpdating ? "Saving..." : <><Zap className="w-4 h-4 fill-current inline" /> Save Identity</>}
                   </button>
                 </div>
               </form>

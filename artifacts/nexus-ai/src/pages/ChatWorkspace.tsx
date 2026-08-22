@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Send, Copy, Sparkles, Check } from "lucide-react";
+import { Send, Copy, Sparkles, Check, Zap, Landmark } from "lucide-react";
 import { useUsage } from "@/hooks/useUsage";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -292,7 +292,11 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
             }`}
             data-testid="chat-header-query-counter"
           >
-            {userTier === "pro" ? "UNLIMITED ⚡" : `${remainingQueries} / ${dailyLimit} queries ⚡`}
+            {userTier === "pro" ? (
+              <span className="flex items-center gap-1"><Zap className="w-3.5 h-3.5 fill-amber-300" /> UNLIMITED</span>
+            ) : (
+              <span className="flex items-center gap-1"><Zap className="w-3.5 h-3.5 fill-[#00C8FF]" /> {remainingQueries} / {dailyLimit} queries</span>
+            )}
           </div>
 
           <div className="relative flex items-center justify-center w-2.5 h-2.5">
@@ -327,15 +331,15 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: "spring" }}
-              className="w-16 h-16 rounded-2xl bg-primary/10 border-2 border-[#00FFB3] flex items-center justify-center text-3xl mb-6 shadow-[4px_4px_0px_#00FFB3]"
+              className="w-16 h-16 rounded-2xl bg-primary/10 border-2 border-[#00FFB3] flex items-center justify-center mb-6 shadow-[4px_4px_0px_#00FFB3]"
             >
-              🏛️
+              <Landmark className="w-8 h-8 text-[#00FFB3]" />
             </motion.div>
             <h1 className="font-display text-lg text-foreground mb-3 tracking-widest font-bold">
               MULTI-AGENT COUNCIL STANDBY
             </h1>
             <p className="text-slate-300 text-sm leading-relaxed mb-6 font-sans">
-              Select a domain council above or use ✨ Auto-Detect, submit your question, and watch 3 specialized AI agents debate in parallel before synthesizing a final verdict.
+              Select a domain council above or use <Sparkles className="w-4 h-4 text-[#00FFB3] inline mx-1" /> Auto-Detect, submit your question, and watch 3 specialized AI agents debate in parallel before synthesizing a final verdict.
             </p>
           </div>
         ) : (
