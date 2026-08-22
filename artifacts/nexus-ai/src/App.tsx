@@ -119,28 +119,22 @@ function AppRouter() {
 }
 
 function App() {
-  const content = (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <AuthProvider>
-            <AppRouter />
-          </AuthProvider>
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+  const clerkKey = PUBLISHABLE_KEY || "pk_test_dummy";
+
+  return (
+    <ClerkProvider publishableKey={clerkKey} afterSignOutUrl="/">
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <AuthProvider>
+              <AppRouter />
+            </AuthProvider>
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ClerkProvider>
   );
-
-  if (PUBLISHABLE_KEY) {
-    return (
-      <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignOutUrl="/">
-        {content}
-      </ClerkProvider>
-    );
-  }
-
-  return content;
 }
 
 export default App;
