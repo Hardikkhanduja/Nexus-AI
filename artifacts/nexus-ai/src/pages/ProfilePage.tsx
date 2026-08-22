@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
 import { SignedIn, UserButton } from "@clerk/clerk-react";
-import { Bot, Brain, Sparkles, Search, Zap, Target, Edit3 } from "lucide-react";
+import { Link } from "wouter";
+import { Bot, Brain, Sparkles, Search, Zap, Target, Edit3, Home } from "lucide-react";
 
 interface ProfilePageProps {
   onOpenSidebar: () => void;

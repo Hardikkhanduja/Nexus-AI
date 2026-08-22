@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useUsage } from "@/hooks/useUsage";
 import { useUser, SignedIn, UserButton } from "@clerk/clerk-react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import {
   Gauge,
   Zap,
@@ -17,7 +17,8 @@ import {
   TrendingUp,
   Cpu,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  Home
 } from "lucide-react";
 
 interface UsagePageProps {

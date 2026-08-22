@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Send, Copy, Sparkles, Check, Zap, Landmark } from "lucide-react";
+import { Send, Copy, Sparkles, Check, Zap, Landmark, Home } from "lucide-react";
 import { useUsage } from "@/hooks/useUsage";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { useLocation, useParams } from "wouter";
+import { useLocation, useParams, Link } from "wouter";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";

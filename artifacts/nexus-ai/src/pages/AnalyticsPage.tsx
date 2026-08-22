@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { SignedIn, UserButton } from "@clerk/clerk-react";
 import {
   BarChart3,
@@ -14,7 +14,8 @@ import {
   ChevronRight,
   Radio,
   Zap,
-  Inbox
+  Inbox,
+  Home
 } from "lucide-react";
 import {
   AreaChart,

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { SignedIn, UserButton } from "@clerk/clerk-react";
+import { useLocation, Link } from "wouter";
 import {
   MessageSquareHeart,
   Star,
@@ -12,7 +13,8 @@ import {
   Sparkles,
   User,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  Home
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { SignedIn, UserButton } from "@clerk/clerk-react";
 import {
   Cpu,
@@ -17,7 +17,8 @@ import {
   Activity,
   Inbox,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  Home
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 

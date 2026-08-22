@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useUser } from "@clerk/clerk-react";
 import { useUsage } from "@/hooks/useUsage";
 import { 
-  PlusCircle, MessageSquare, BarChart2, Activity, Bookmark, 
+  Home, PlusCircle, MessageSquare, BarChart2, Activity, Bookmark, 
   LogIn, User, Settings, Gauge, BookOpen, MessageCircle, LogOut 
 } from "lucide-react";
 
@@ -15,6 +15,7 @@ interface SidebarProps {
 }
 
 const mainItems = [
+  { icon: Home, label: "Home", path: "/" },
   { icon: PlusCircle, label: "New Chat", path: "/chat" },
   { icon: MessageSquare, label: "Chat History", path: "/history" },
   { icon: BarChart2, label: "Analytics", path: "/analytics" },

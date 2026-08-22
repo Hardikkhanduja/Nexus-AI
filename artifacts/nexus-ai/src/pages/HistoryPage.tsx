@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
 import {
   Search,
@@ -14,7 +14,8 @@ import {
   Rocket,
   Cloud,
   Layers,
-  ChevronRight
+  ChevronRight,
+  Home
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
