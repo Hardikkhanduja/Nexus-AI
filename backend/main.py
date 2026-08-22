@@ -4,7 +4,8 @@ from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, WebSocket, Header, HTTPException, Depends, status, Request
+from fastapi import FastAPI, WebSocket, Header, HTTPException, Depends, status, Request, Response
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
@@ -37,14 +38,36 @@ app = FastAPI(
 )
 
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[FRONTEND_URL, "http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_origin_regex=r"https?://.*",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@app.middleware("http")
+async def add_cors_headers(request: Request, call_next):
+    origin = request.headers.get("origin")
+    
+    if request.method == "OPTIONS":
+        response = Response(status_code=200)
+        if origin:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+        else:
+            response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, X-Requested-With"
+        return response
+
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        logger.error(f"Unhandled server exception: {exc}")
+        response = JSONResponse(status_code=500, content={"error": str(exc)})
+
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    else:
+        response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, X-Requested-With"
+    
+    return response
 
 async def get_current_user(authorization: Optional[str] = Header(None)):
     if not authorization:
