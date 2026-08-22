@@ -17,7 +17,7 @@ services:
   - type: web
     name: nexus-ai-frontend
     env: static
-    buildCommand: cd artifacts/nexus-ai && npm install && npm run build
+    buildCommand: npm install -g pnpm && pnpm install && pnpm --filter @workspace/nexus-ai build
     staticPublishPath: ./artifacts/nexus-ai/dist/public
     envVars:
       - key: NODE_VERSION
