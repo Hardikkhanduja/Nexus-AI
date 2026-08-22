@@ -19,6 +19,7 @@ import LoginPage from "@/pages/LoginPage";
 import SignUpPage from "@/pages/SignUpPage";
 import ProfilePage from "@/pages/ProfilePage";
 import UsagePage from "@/pages/UsagePage";
+import SharePage from "@/pages/SharePage";
 import NotFound from "@/pages/not-found";
 import { AuthProvider } from "@/contexts/AuthContext";
 
@@ -45,6 +46,9 @@ function AppRouter() {
           </Route>
           <Route path="/chat/:conversationId">
             <ChatWorkspace onOpenSidebar={openSidebar} />
+          </Route>
+          <Route path="/share/:conversationId">
+            <SharePage />
           </Route>
 
           <Route path="/history">

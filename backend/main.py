@@ -227,6 +227,54 @@ async def get_conversation(
         logger.error(f"Failed to fetch conversation: {e}")
         return {"id": conversation_id, "title": "New Discussion", "messages": []}
 
+@app.get("/api/ai/shared/{conversation_id}")
+async def get_shared_conversation(conversation_id: str):
+    """Public endpoint to view shared multi-agent conversations without authentication."""
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT id, title, created_at FROM conversations WHERE id = %s",
+                    (conversation_id,),
+                )
+                conv_row = cur.fetchone()
+                if not conv_row:
+                    raise HTTPException(status_code=404, detail="Shared discussion not found")
+                
+                cur.execute(
+                    """
+                    SELECT id, role, content, agent_name, conflict_analysis, created_at 
+                    FROM messages 
+                    WHERE conversation_id = %s 
+                    ORDER BY created_at ASC
+                    """,
+                    (conversation_id,),
+                )
+                msg_rows = cur.fetchall()
+                messages = []
+                for row in msg_rows:
+                    messages.append({
+                        "id": row[0],
+                        "role": row[1],
+                        "content": row[2],
+                        "agentName": row[3],
+                        "conflictAnalysis": row[4],
+                        "createdAt": row[5].isoformat() if row[5] else None,
+                    })
+                
+                return {
+                    "id": conv_row[0],
+                    "title": conv_row[1],
+                    "createdAt": conv_row[2].isoformat() if conv_row[2] else None,
+                    "messages": messages,
+                    "isShared": True
+                }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch shared conversation: {e}")
+        raise HTTPException(status_code=500, detail="Error fetching shared conversation")
+
 @app.post("/api/ai/conversations/{conversation_id}/generate-title")
 async def generate_conversation_title(conversation_id: str, current_user: dict = Depends(get_current_user)):
     """Auto-generate a 3-4 word title for a conversation using first prompt content."""

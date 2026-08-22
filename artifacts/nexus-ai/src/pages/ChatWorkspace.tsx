@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
-import { Send, Copy, Sparkles, Check, Zap, Landmark, Home } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Send, Copy, Sparkles, Check, Zap, Landmark, Home, Share2, X, ExternalLink, FileText } from "lucide-react";
 import { useUsage } from "@/hooks/useUsage";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -43,6 +43,15 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  // Share Modal States
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [copiedShareLink, setCopiedShareLink] = useState(false);
+  const [copiedMarkdown, setCopiedMarkdown] = useState(false);
+  const [createdConvId, setCreatedConvId] = useState<string | null>(null);
+
+  const activeConvId = conversationId || createdConvId;
+  const shareUrl = activeConvId ? `${window.location.origin}/share/${activeConvId}` : window.location.href;
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Fetch initial tier status
@@ -72,6 +81,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
     if (!conversationId) {
       setMessages([]);
       setConversationTitle("NEW DISCUSSION");
+      setCreatedConvId(null);
       return;
     }
 
@@ -157,6 +167,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
       ]);
 
       if (returnedConvId) {
+        setCreatedConvId(returnedConvId);
         window.history.replaceState(null, "", `/chat/${returnedConvId}`);
         fetch(`/api/ai/conversations/${returnedConvId}/generate-title`, { method: "POST" })
           .then((res) => res.json())
@@ -203,7 +214,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
       },
     ]);
 
-    sendMessage(userPrompt, conversationId, provider, selectedCouncilId);
+    sendMessage(userPrompt, conversationId || createdConvId || undefined, provider, selectedCouncilId);
     setPrompt("");
   };
 
@@ -215,6 +226,51 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
       description: "Content copied to clipboard.",
     });
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleCopyShareLink = () => {
+    navigator.clipboard.writeText(shareUrl);
+    setCopiedShareLink(true);
+    toast({
+      title: "Public Link Copied!",
+      description: "Anyone with this link can view the shared discussion.",
+    });
+    setTimeout(() => setCopiedShareLink(false), 2000);
+  };
+
+  const handleCopyMarkdown = () => {
+    if (!messages.length) return;
+    let md = `# ${conversationTitle}\n\n`;
+    messages.forEach((msg) => {
+      if (msg.role === "user") {
+        md += `### 👤 User Prompt\n${msg.content}\n\n`;
+      } else {
+        md += `### 🏛️ ${msg.agentName || "Nexus Synthesizer"} Verdict\n${msg.content}\n\n`;
+      }
+    });
+    navigator.clipboard.writeText(md);
+    setCopiedMarkdown(true);
+    toast({
+      title: "Markdown Copied!",
+      description: "Full debate transcript copied in Markdown format.",
+    });
+    setTimeout(() => setCopiedMarkdown(false), 2000);
+  };
+
+  const handleSocialShare = (platform: "twitter" | "linkedin" | "whatsapp") => {
+    const text = encodeURIComponent(`Check out this Multi-Agent AI Council debate on Nexus AI: "${conversationTitle}"`);
+    const url = encodeURIComponent(shareUrl);
+    let shareLink = "";
+
+    if (platform === "twitter") {
+      shareLink = `https://twitter.com/intent/tweet?text=${text}&url=${url}`;
+    } else if (platform === "linkedin") {
+      shareLink = `https://www.linkedin.com/sharing/share-offsite/?url=${url}`;
+    } else if (platform === "whatsapp") {
+      shareLink = `https://api.whatsapp.com/send?text=${text}%20${url}`;
+    }
+
+    window.open(shareLink, "_blank");
   };
 
   const dailyLimit = wsLimit !== null && wsLimit !== undefined ? wsLimit : (usage?.dailyQueryLimit || 30);
@@ -269,7 +325,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
               <div className="h-[3px] bg-[#00FFB3] w-full rounded-full"></div>
             </div>
           </button>
-          <h2 className="font-display text-xs text-[#00FFB3] tracking-widest mt-1 flex items-center gap-1 truncate font-bold max-w-[min(65vw,650px)]">
+          <h2 className="font-display text-xs text-[#00FFB3] tracking-widest mt-1 flex items-center gap-1 truncate font-bold max-w-[min(55vw,550px)]">
             {conversationTitle.toUpperCase()}
             {isStreaming && (
               <motion.span
@@ -283,6 +339,18 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
         </div>
 
         <div className="flex items-center gap-3 shrink-0 font-mono">
+          {/* SHARE BUTTON */}
+          {messages.length > 0 && (
+            <button
+              onClick={() => setIsShareModalOpen(true)}
+              className="border-2 border-[#00FFB3] text-[#00FFB3] hover:bg-[#00FFB3]/10 font-mono font-bold text-xs px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-[2px_2px_0px_#00C8FF] hover:scale-105 active:scale-95"
+              data-testid="button-open-share-modal"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">SHARE</span>
+            </button>
+          )}
+
           <div
             onClick={handleToggleTier}
             className={`border-2 rounded-full px-3.5 py-1 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-colors ${
@@ -483,6 +551,114 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
           </form>
         </div>
       </footer>
+
+      {/* CYBERPUNK SHARE CONVERSATION MODAL */}
+      <AnimatePresence>
+        {isShareModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-lg bg-[#0D0D12] border-3 border-[#00FFB3] rounded-2xl p-6 shadow-[0_0_25px_rgba(0,255,179,0.25)] space-y-6 relative text-slate-100"
+            >
+              {/* MODAL HEADER */}
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <Share2 className="w-5 h-5 text-[#00FFB3]" />
+                  <h3 className="font-mono text-sm font-bold text-[#00FFB3] uppercase tracking-wider">
+                    Share Multi-Agent Conversation
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setIsShareModalOpen(false)}
+                  className="p-1 rounded-lg border border-slate-700 hover:border-rose-400 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* SHARE LINK BOX */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">
+                  Public Shareable URL
+                </label>
+                <div className="flex items-center gap-2 bg-[#14141A] border border-slate-700 rounded-xl p-2 font-mono text-xs">
+                  <input
+                    type="text"
+                    readOnly
+                    value={shareUrl}
+                    className="bg-transparent border-none outline-none text-[#00C8FF] w-full px-2"
+                  />
+                  <button
+                    onClick={handleCopyShareLink}
+                    className="bg-[#00FFB3] text-[#0D0D12] font-mono text-xs font-bold px-3 py-2 rounded-lg hover:bg-[#00FFB3]/90 transition-all shrink-0 flex items-center gap-1 cursor-pointer"
+                    data-testid="button-copy-modal-link"
+                  >
+                    {copiedShareLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedShareLink ? "Copied" : "Copy Link"}</span>
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400 font-sans">
+                  Anyone with this link can inspect the full debate transcript and synthesized verdict without logging in.
+                </p>
+              </div>
+
+              {/* ACTION BUTTONS GRID */}
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                {/* COPY MARKDOWN */}
+                <button
+                  onClick={handleCopyMarkdown}
+                  className="p-3 bg-[#14141A] border border-slate-700 hover:border-[#FF4FD8] rounded-xl flex items-center justify-center gap-2 text-xs font-mono font-bold text-slate-200 hover:text-[#FF4FD8] transition-all cursor-pointer"
+                >
+                  <FileText className="w-4 h-4 text-[#FF4FD8]" />
+                  <span>{copiedMarkdown ? "Copied Markdown!" : "Copy as Markdown"}</span>
+                </button>
+
+                {/* OPEN PREVIEW */}
+                <button
+                  onClick={() => {
+                    setIsShareModalOpen(false);
+                    if (activeConvId) setLocation(`/share/${activeConvId}`);
+                  }}
+                  className="p-3 bg-[#14141A] border border-slate-700 hover:border-[#00C8FF] rounded-xl flex items-center justify-center gap-2 text-xs font-mono font-bold text-slate-200 hover:text-[#00C8FF] transition-all cursor-pointer"
+                >
+                  <ExternalLink className="w-4 h-4 text-[#00C8FF]" />
+                  <span>Preview Shared Page</span>
+                </button>
+              </div>
+
+              {/* SOCIAL SHORTCUTS */}
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">
+                  Share Directly to Social Channels
+                </span>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => handleSocialShare("twitter")}
+                    className="py-2.5 px-3 bg-[#14141A] border border-slate-800 hover:border-[#00C8FF] text-slate-200 font-mono text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <span>Twitter / X</span>
+                  </button>
+                  <button
+                    onClick={() => handleSocialShare("linkedin")}
+                    className="py-2.5 px-3 bg-[#14141A] border border-slate-800 hover:border-[#00C8FF] text-slate-200 font-mono text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <span>LinkedIn</span>
+                  </button>
+                  <button
+                    onClick={() => handleSocialShare("whatsapp")}
+                    className="py-2.5 px-3 bg-[#14141A] border border-slate-800 hover:border-[#00FFB3] text-slate-200 font-mono text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <span>WhatsApp</span>
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
+
