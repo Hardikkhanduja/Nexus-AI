@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
-import { useUser } from "@clerk/clerk-react";
+import { useClerkSafe } from "@/lib/clerk";
 import { useUsage } from "@/hooks/useUsage";
 import { 
   Home, PlusCircle, MessageSquare, BarChart2, Activity, Bookmark, 
@@ -25,7 +25,7 @@ const mainItems = [
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [location, setLocation] = useLocation();
   const { user: localUser, isAuthenticated: localIsAuth, logout: localLogout } = useAuth();
-  const { user: clerkUser, isSignedIn: clerkIsSignedIn } = useUser();
+  const { user: clerkUser, isSignedIn: clerkIsSignedIn } = useClerkSafe();
   const { usage } = useUsage();
   const [recentConversations, setRecentConversations] = useState<{ id: string; title: string }[]>([]);
 

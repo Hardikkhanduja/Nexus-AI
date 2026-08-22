@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { SignIn, useUser } from "@clerk/clerk-react";
+import { SignIn } from "@clerk/clerk-react";
+import { useClerkSafe, HAS_CLERK_KEY } from "@/lib/clerk";
 import { useLocation, Link } from "wouter";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,7 +8,7 @@ import { ArrowRight } from "lucide-react";
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
-  const { isSignedIn } = useUser();
+  const { isSignedIn } = useClerkSafe();
   const { isAuthenticated: isLocalAuth, login, refreshUser } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -37,7 +38,7 @@ export default function LoginPage() {
     }
   };
 
-  const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+  const showClerk = HAS_CLERK_KEY;
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-6 relative bg-[#08080B]" data-testid="page-login">
@@ -56,7 +57,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {publishableKey ? (
+        {showClerk ? (
           <div className="w-full border-2 border-[#00FFB3] rounded-2xl p-4 bg-[#14141A] shadow-[4px_4px_0px_#00FFB3]">
             <SignIn
               routing="path"

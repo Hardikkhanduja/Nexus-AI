@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { useAuth as useClerkAuth, useUser } from "@clerk/clerk-react";
+import { useClerkSafe, HAS_CLERK_KEY } from "@/lib/clerk";
+import { useAuth as useClerkAuth } from "@clerk/clerk-react";
 import { useAuth, apiFetch } from "@/contexts/AuthContext";
 
 export interface UsageData {
@@ -12,8 +13,9 @@ export interface UsageData {
 }
 
 export function useUsage() {
-  const { isSignedIn, isLoaded: clerkLoaded, user: clerkUser } = useUser();
-  const { getToken: getClerkToken } = useClerkAuth();
+  const { isSignedIn, isLoaded: clerkLoaded, user: clerkUser } = useClerkSafe();
+  const clerkAuth = HAS_CLERK_KEY ? useClerkAuth() : { getToken: null };
+  const getClerkToken = clerkAuth?.getToken;
   const { isAuthenticated: customAuth, isLoading: authLoading } = useAuth();
   
   const isAuthenticated = Boolean(isSignedIn || customAuth);

@@ -22,8 +22,7 @@ import UsagePage from "@/pages/UsagePage";
 import SharePage from "@/pages/SharePage";
 import NotFound from "@/pages/not-found";
 import { AuthProvider } from "@/contexts/AuthContext";
-
-const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+import { HAS_CLERK_KEY, PUBLISHABLE_KEY } from "@/lib/clerk";
 
 const queryClient = new QueryClient();
 
@@ -119,22 +118,28 @@ function AppRouter() {
 }
 
 function App() {
-  const clerkKey = PUBLISHABLE_KEY || "pk_test_dummy";
-
-  return (
-    <ClerkProvider publishableKey={clerkKey} afterSignOutUrl="/">
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <AuthProvider>
-              <AppRouter />
-            </AuthProvider>
-          </WouterRouter>
-          <Toaster />
-        </TooltipProvider>
-      </QueryClientProvider>
-    </ClerkProvider>
+  const content = (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <AuthProvider>
+            <AppRouter />
+          </AuthProvider>
+        </WouterRouter>
+        <Toaster />
+      </TooltipProvider>
+    </QueryClientProvider>
   );
+
+  if (HAS_CLERK_KEY) {
+    return (
+      <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignOutUrl="/">
+        {content}
+      </ClerkProvider>
+    );
+  }
+
+  return content;
 }
 
 export default App;

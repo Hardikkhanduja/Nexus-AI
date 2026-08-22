@@ -1,11 +1,12 @@
 import React from "react";
-import { SignUp, useUser } from "@clerk/clerk-react";
+import { SignUp } from "@clerk/clerk-react";
+import { useClerkSafe } from "@/lib/clerk";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 
 export default function SignUpPage() {
   const [, setLocation] = useLocation();
-  const { isSignedIn } = useUser();
+  const { isSignedIn } = useClerkSafe();
 
   React.useEffect(() => {
     if (isSignedIn) {
