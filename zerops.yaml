@@ -9,18 +9,16 @@ zerops:
     build:
       base: python@3.11
       buildCommands:
-        - python -m venv venv
-        - ./venv/bin/pip install --upgrade pip
-        - ./venv/bin/pip install -r backend/requirements.txt
+        - pip install --target site-packages -r backend/requirements.txt
       deployFiles:
         - backend
-        - venv
+        - site-packages
     run:
       base: python@3.11
-      start: ./venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000 --ws auto --proxy-headers --forwarded-allow-ips='*'
+      start: python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --ws auto --proxy-headers --forwarded-allow-ips='*'
       envVariables:
         PORT: "8000"
-        PYTHONPATH: "."
+        PYTHONPATH: "./site-packages:."
 
   # 3. React Vite Static Frontend
   - setup: app
