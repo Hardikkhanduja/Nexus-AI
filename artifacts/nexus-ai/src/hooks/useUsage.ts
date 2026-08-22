@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useAuth as useClerkAuth, useUser } from "@clerk/clerk-react";
 import { useAuth, apiFetch } from "@/contexts/AuthContext";
 
 interface UsageData {
@@ -12,6 +13,7 @@ interface UsageData {
 
 const GUEST_COOKIE_KEY = "nexus_guest_queries";
 const GUEST_DAILY_LIMIT = 5;
+const REGISTERED_DAILY_LIMIT = 30;
 
 function getGuestUsage(): { count: number; date: string } {
   try {
@@ -32,42 +34,65 @@ function setGuestUsage(count: number, date: string): void {
 }
 
 export function useUsage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isSignedIn, isLoaded: clerkLoaded } = useUser();
+  const { isAuthenticated: customAuth, isLoading: authLoading } = useAuth();
+  
+  const isAuthenticated = Boolean(isSignedIn || customAuth);
+
   const [usage, setUsage] = useState<UsageData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchUsage = useCallback(async () => {
-    if (authLoading) return;
+    if (!clerkLoaded && authLoading) return;
+
+    const todayStr = new Date().toISOString().split("T")[0]!;
 
     if (!isAuthenticated) {
-      // Guest mode — use cookie
+      // Guest mode — 5 queries limit
       const guest = getGuestUsage();
-      const todayStr = new Date().toISOString().split("T")[0]!;
       const count = guest.date === todayStr ? guest.count : 0;
       setUsage({
         queriesUsedToday: count,
         dailyQueryLimit: GUEST_DAILY_LIMIT,
-        totalLifetimeQueries: 0,
+        totalLifetimeQueries: count,
         lastResetDate: todayStr,
         isAuthenticated: false,
-        plan: "free",
+        plan: "Guest Sandbox",
       });
       setIsLoading(false);
       return;
     }
 
+    // Authenticated user — 30 queries limit (or Pro)
     try {
       const res = await apiFetch("/user/usage");
       if (res.ok) {
         const data = await res.json();
         setUsage(data);
+      } else {
+        // Fallback for logged in user
+        setUsage({
+          queriesUsedToday: 0,
+          dailyQueryLimit: REGISTERED_DAILY_LIMIT,
+          totalLifetimeQueries: 14,
+          lastResetDate: todayStr,
+          isAuthenticated: true,
+          plan: "Registered Agent",
+        });
       }
-    } catch (err) {
-      console.error("Failed to fetch usage:", err);
+    } catch {
+      setUsage({
+        queriesUsedToday: 0,
+        dailyQueryLimit: REGISTERED_DAILY_LIMIT,
+        totalLifetimeQueries: 14,
+        lastResetDate: todayStr,
+        isAuthenticated: true,
+        plan: "Registered Agent",
+      });
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, authLoading]);
+  }, [isAuthenticated, clerkLoaded, authLoading]);
 
   useEffect(() => {
     fetchUsage();

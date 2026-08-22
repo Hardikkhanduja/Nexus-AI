@@ -137,8 +137,14 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
         },
       ]);
 
-      if (!conversationId && returnedConvId) {
+      if (returnedConvId) {
         window.history.replaceState(null, "", `/chat/${returnedConvId}`);
+        fetch(`/api/ai/conversations/${returnedConvId}/generate-title`, { method: "POST" })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.title) setConversationTitle(data.title);
+          })
+          .catch(() => {});
       }
     },
     onError: (msg) => {

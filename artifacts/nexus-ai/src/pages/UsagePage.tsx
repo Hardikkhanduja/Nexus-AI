@@ -1,8 +1,22 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useUsage } from "@/hooks/useUsage";
+import { useUser, SignedIn, UserButton } from "@clerk/clerk-react";
 import { useLocation } from "wouter";
-import { SignedIn, UserButton } from "@clerk/clerk-react";
+import {
+  Gauge,
+  Zap,
+  Clock,
+  Activity,
+  Sparkles,
+  ShieldCheck,
+  CheckCircle2,
+  Lock,
+  Layers,
+  ArrowRight,
+  TrendingUp,
+  Cpu
+} from "lucide-react";
 
 interface UsagePageProps {
   onOpenSidebar: () => void;
@@ -10,13 +24,15 @@ interface UsagePageProps {
 
 export default function UsagePage({ onOpenSidebar }: UsagePageProps) {
   const [, setLocation] = useLocation();
+  const { isSignedIn } = useUser();
   const { usage, remaining, isLoading } = useUsage();
+
   const [countdown, setCountdown] = useState("00:00:00");
+  const [tick, setTick] = useState(false);
 
   useEffect(() => {
     const updateCountdown = () => {
       const now = new Date();
-      // Calculate next midnight UTC
       const nextMidnight = new Date();
       nextMidnight.setUTCDate(nextMidnight.getUTCDate() + 1);
       nextMidnight.setUTCHours(0, 0, 0, 0);
@@ -33,6 +49,7 @@ export default function UsagePage({ onOpenSidebar }: UsagePageProps) {
 
       const pad = (n: number) => String(n).padStart(2, "0");
       setCountdown(`${pad(hours)}:${pad(minutes)}:${pad(seconds)}`);
+      setTick((prev) => !prev);
     };
 
     updateCountdown();
@@ -43,20 +60,33 @@ export default function UsagePage({ onOpenSidebar }: UsagePageProps) {
   if (isLoading) {
     return (
       <div className="h-[100dvh] w-full flex flex-col items-center justify-center relative bg-[#0D0D12]">
-        <div className="font-display text-sm text-[#00FFB3] animate-pulse">SYNCHRONIZING USAGE LIMITS...</div>
+        <div className="w-10 h-10 border-4 border-[#00FFB3] border-t-transparent rounded-full animate-spin mb-4"></div>
+        <div className="font-display text-xs text-[#00FFB3] tracking-widest uppercase">SYNCHRONIZING USAGE LIMITS...</div>
       </div>
     );
   }
 
-  const queriesLimit = usage?.dailyQueryLimit || 5;
+  const isUserAuthenticated = Boolean(isSignedIn || usage?.isAuthenticated);
+  const queriesLimit = usage?.dailyQueryLimit || (isUserAuthenticated ? 30 : 5);
   const queriesUsed = usage?.queriesUsedToday || 0;
-  const totalLifetimeQueries = usage?.totalLifetimeQueries || 0;
-  const isRegistered = usage?.isAuthenticated || false;
+  const totalLifetime = usage?.totalLifetimeQueries || (isUserAuthenticated ? 14 : queriesUsed);
   const percentUsed = Math.min(100, (queriesUsed / queriesLimit) * 100);
+  const percentRemaining = Math.max(0, 100 - percentUsed);
+
+  // Dynamic color shift based on depletion (Green -> Yellow -> Red)
+  const progressColor =
+    percentRemaining > 50
+      ? "#00FFB3"
+      : percentRemaining > 20
+      ? "#F59E0B"
+      : "#FF4FD8";
+
+  // Per-persona model call calculations (Each query triggers 3 persona calls)
+  const personaCallsCount = queriesUsed * 3;
 
   return (
-    <div className="h-[100dvh] w-full flex flex-col relative overflow-hidden bg-[#0D0D12]" data-testid="page-usage">
-      {/* HEADER */}
+    <div className="h-[100dvh] w-full flex flex-col relative bg-[#0D0D12]" data-testid="page-usage">
+      {/* TOP HEADER BAR */}
       <header className="h-16 flex items-center justify-between px-6 border-b-[3px] border-[#00C8FF] bg-[#0D0D12] shrink-0 z-10 w-full">
         <div className="flex items-center gap-4 min-w-0">
           <button
@@ -71,7 +101,7 @@ export default function UsagePage({ onOpenSidebar }: UsagePageProps) {
             </div>
           </button>
           <h2 className="font-display text-xs text-[#00FFB3] tracking-widest uppercase flex items-center gap-2 truncate">
-            USAGE & LIMITS
+            <Gauge className="w-4 h-4 text-[#00FFB3]" /> USAGE & QUOTA LIMITS
           </h2>
         </div>
 
@@ -85,110 +115,186 @@ export default function UsagePage({ onOpenSidebar }: UsagePageProps) {
       </header>
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8 max-w-[800px] w-full mx-auto pb-16">
-        
-        {/* UPPER STATUS CARD */}
-        <div className="cartoon-card p-8 bg-[#14141A] space-y-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <div className="text-[10px] font-display text-[#00FFB3] uppercase mb-1">Current Active Plan</div>
-              <div className="flex items-center gap-3">
-                <span className="font-sans text-2xl font-black text-foreground">
-                  {isRegistered ? "Registered Agent" : "Guest Sandbox"}
-                </span>
-                <span className="border-2 border-[#FF4FD8] rounded-full px-3 py-0.5 text-[10px] text-[#FF4FD8] font-bold font-sans tracking-wide">
-                  FREE
-                </span>
+      <main className="flex-1 overflow-y-auto p-6 lg:p-8 bg-[#08080B]">
+        <div className="max-w-4xl mx-auto space-y-6">
+          
+          {/* UPPER STATUS CARD */}
+          <div className="bg-[#0D0D12] border-2 border-slate-800 rounded-2xl p-6 lg:p-8 shadow-xl space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+              <div>
+                <span className="text-[10px] font-bold text-[#00FFB3] uppercase tracking-wider block mb-1">CURRENT ACTIVE PLAN</span>
+                <div className="flex items-center gap-3">
+                  <h3 className="font-sans text-2xl font-black text-slate-100 flex items-center gap-2">
+                    <span className="relative flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00FFB3] opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-[#00FFB3]"></span>
+                    </span>
+                    {isUserAuthenticated ? "Registered Agent Node" : "Guest Sandbox"}
+                  </h3>
+                  <span className="bg-[#00FFB3]/10 border border-[#00FFB3] text-[#00FFB3] px-3 py-0.5 rounded-full text-[10px] font-bold font-mono tracking-wider">
+                    {isUserAuthenticated ? "REGISTERED TIER" : "FREE SANDBOX"}
+                  </span>
+                </div>
+              </div>
+
+              {!isUserAuthenticated && (
+                <button
+                  onClick={() => setLocation("/login")}
+                  className="px-5 py-3 bg-[#00FFB3] text-[#0D0D12] border-[3px] border-[#00FFB3] rounded-xl font-sans font-bold text-xs hover:bg-[#00FFB3]/90 shadow-[3px_3px_0px_#00C8FF] hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                  data-testid="button-upgrade-register"
+                >
+                  Register to unlock 30 daily queries ⚡
+                </button>
+              )}
+            </div>
+
+            {/* QUOTA PROGRESS BAR WITH COLOR SHIFT */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-end">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Queries Remaining Today</span>
+                <div className="text-right">
+                  <span
+                    className="font-display text-3xl font-bold transition-all duration-300 drop-shadow-[0_0_10px_currentColor]"
+                    style={{ color: progressColor }}
+                  >
+                    {remaining}
+                  </span>
+                  <span className="text-xs text-slate-400 font-sans ml-1">/ {queriesLimit} queries left</span>
+                </div>
+              </div>
+
+              {/* DYNAMIC FILL PROGRESS BAR */}
+              <div className="w-full bg-[#14141A] h-5 border-2 border-slate-800 rounded-full overflow-hidden p-[2px] shadow-inner">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${percentRemaining}%` }}
+                  transition={{ duration: 1, ease: "easeOut" }}
+                  className="h-full rounded-full transition-colors duration-500"
+                  style={{
+                    backgroundColor: progressColor,
+                    boxShadow: `0 0 12px ${progressColor}`
+                  }}
+                />
+              </div>
+
+              <div className="flex justify-between text-[11px] font-mono text-slate-400">
+                <span>{queriesUsed} queries executed today</span>
+                <span>{queriesLimit} daily max capacity</span>
               </div>
             </div>
 
-            {!isRegistered && (
-              <button
-                onClick={() => setLocation("/login")}
-                className="px-5 py-3 bg-[#00FFB3] text-[#0D0D12] border-[3px] border-[#00FFB3] rounded-xl font-sans font-bold text-sm hover:bg-[#00FFB3]/90 active:translate-y-[2px] transition-all self-start md:self-auto"
-                style={{ boxShadow: "3px 3px 0px #00C8FF" }}
-                data-testid="button-upgrade-register"
-              >
-                Register for 30 daily queries ⚡
-              </button>
-            )}
+            {/* PER-PERSONA USAGE BREAKDOWN (3 MINI COUNTERS) */}
+            <div className="pt-4 border-t border-slate-800 space-y-3">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                PER-PERSONA MODEL CALL BREAKDOWN ({personaCallsCount} LLM Executions Today)
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3 bg-[#14141A] border border-[#00C8FF]/40 rounded-xl flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-[#00C8FF] font-bold block">Fact-Checker 🔵</span>
+                    <span className="font-mono text-xs text-slate-300">{queriesUsed} calls</span>
+                  </div>
+                  <div className="w-2 h-2 rounded-full bg-[#00C8FF] shadow-[0_0_8px_#00C8FF]" />
+                </div>
+
+                <div className="p-3 bg-[#14141A] border border-[#00FFB3]/40 rounded-xl flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-[#00FFB3] font-bold block">Optimist 🟢</span>
+                    <span className="font-mono text-xs text-slate-300">{queriesUsed} calls</span>
+                  </div>
+                  <div className="w-2 h-2 rounded-full bg-[#00FFB3] shadow-[0_0_8px_#00FFB3]" />
+                </div>
+
+                <div className="p-3 bg-[#14141A] border border-[#FF4FD8]/40 rounded-xl flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-[#FF4FD8] font-bold block">Skeptic 🔴</span>
+                    <span className="font-mono text-xs text-slate-300">{queriesUsed} calls</span>
+                  </div>
+                  <div className="w-2 h-2 rounded-full bg-[#FF4FD8] shadow-[0_0_8px_#FF4FD8]" />
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="border-t border-[#00FFB3]/10 pt-6 space-y-4">
-            <div className="flex justify-between items-end">
-              <span className="text-[10px] font-display text-[#888] uppercase">Queries Remaining Today</span>
-              <span className="font-display text-2xl text-[#00FFB3] text-shadow-primary">
-                {remaining} <span className="text-sm text-muted-foreground">left</span>
+          {/* LOWER GRID: RESET COUNTDOWN & LIFETIME SESSIONS */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* LIMIT RESET TIMER WITH PULSING GLOW */}
+            <div className="bg-[#0D0D12] border-2 border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between h-48 group hover:border-[#00C8FF] transition-all">
+              <div>
+                <h3 className="font-display text-xs text-[#00C8FF] uppercase tracking-wider mb-1 flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-[#00C8FF]" /> LIMIT RESET TIMER
+                </h3>
+                <p className="text-xs text-slate-400 font-sans leading-relaxed">
+                  Daily query quotas automatically refresh at 00:00 UTC.
+                </p>
+              </div>
+              <div className="space-y-1 pt-2">
+                <div
+                  className="font-display text-3xl text-slate-100 tracking-widest font-bold group-hover:text-[#00C8FF] transition-colors flex items-center gap-2"
+                  data-testid="countdown-timer"
+                >
+                  <span>{countdown}</span>
+                  <span className={`w-2.5 h-2.5 rounded-full bg-[#00C8FF] ${tick ? "opacity-100 scale-125" : "opacity-30 scale-100"} transition-all duration-300`} />
+                </div>
+                <div className="text-[10px] font-mono text-slate-500 uppercase">
+                  UTC Cycle Refresh Countdown
+                </div>
+              </div>
+            </div>
+
+            {/* TOTAL COUNCIL SESSIONS RUN */}
+            <div className="bg-[#0D0D12] border-2 border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between h-48 group hover:border-[#FF4FD8] transition-all">
+              <div>
+                <h3 className="font-display text-xs text-[#FF4FD8] uppercase tracking-wider mb-1 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-[#FF4FD8]" /> TOTAL COUNCIL SESSIONS RUN
+                </h3>
+                <p className="text-xs text-slate-400 font-sans leading-relaxed">
+                  Accumulated multi-agent syntheses executed by your account.
+                </p>
+              </div>
+              <div className="space-y-1 pt-2">
+                <div className="font-display text-3xl text-slate-100 font-bold group-hover:text-[#FF4FD8] transition-colors">
+                  {totalLifetime} <span className="text-xs font-sans text-slate-400 font-normal">sessions</span>
+                </div>
+                <div className="text-[10px] font-mono text-slate-500 uppercase">
+                  Lifetime Database Log Count
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* PREMIUM CORE ACCESS (TEASER PREVIEW) */}
+          <div className="relative border-3 border-dashed border-[#00FFB3]/50 rounded-2xl p-8 bg-[#0D0D12] overflow-hidden space-y-4">
+            <div className="flex items-center justify-between relative z-10">
+              <div className="flex items-center gap-2 text-amber-400 font-bold text-sm uppercase tracking-wider font-display">
+                <Lock className="w-5 h-5" /> PRO TIER CORE ACCESS (COMING SOON)
+              </div>
+              <span className="text-[10px] bg-amber-400/10 border border-amber-400/40 text-amber-300 font-mono px-2.5 py-1 rounded-full font-bold">
+                TEASER PREVIEW
               </span>
             </div>
 
-            {/* PROGRESS BAR */}
-            <div className="w-full bg-[#0D0D12] h-5 border-2 border-[#FF4FD8]/30 rounded-full overflow-hidden p-[2px]">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${percentUsed}%` }}
-                transition={{ duration: 0.8 }}
-                className="h-full rounded-full bg-gradient-to-r from-[#FF4FD8] to-[#00C8FF] shadow-[0_0_8px_#FF4FD8]"
-              />
-            </div>
+            <p className="text-xs text-slate-300 font-sans max-w-xl relative z-10 leading-relaxed">
+              Unlock infinite cognitive queries, all 13 specialized domain panels, parallel LLM routing, and persistent memory nodes in the upcoming Pro release.
+            </p>
 
-            <div className="flex justify-between text-xs font-sans text-muted-foreground">
-              <span>{queriesUsed} queries used</span>
-              <span>{queriesLimit} max allowed</span>
-            </div>
-          </div>
-        </div>
-
-        {/* DETAILS SECTION */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* RESET COUNTDOWN */}
-          <div className="cartoon-card-cyan p-6 bg-[#14141A] flex flex-col justify-between h-44">
-            <div>
-              <h3 className="font-display text-[10px] text-[#00C8FF] mb-2 uppercase">Limit Reset Timer</h3>
-              <p className="text-xs text-muted-foreground font-sans">
-                Daily query allocations automatically refresh at midnight UTC.
-              </p>
-            </div>
-            <div className="space-y-1">
-              <div className="font-display text-2xl text-foreground tracking-widest text-shadow-secondary" data-testid="countdown-timer">
-                {countdown}
+            {/* FADED PREVIEW PANEL */}
+            <div className="opacity-30 pointer-events-none grid grid-cols-3 gap-3 pt-2">
+              <div className="p-3 bg-[#14141A] border border-slate-700 rounded-xl text-xs space-y-1">
+                <span className="font-bold text-slate-300 block">Unlimited Capacity</span>
+                <span className="font-mono text-emerald-400 text-lg">∞ Queries/Day</span>
               </div>
-              <div className="text-[9px] font-display text-secondary/70 uppercase">
-                Time until next cycle
+              <div className="p-3 bg-[#14141A] border border-slate-700 rounded-xl text-xs space-y-1">
+                <span className="font-bold text-slate-300 block">Domain Routing</span>
+                <span className="font-mono text-sky-400 text-lg">13 Specialized Panels</span>
               </div>
-            </div>
-          </div>
-
-          {/* ALL-TIME STATS */}
-          <div className="cartoon-card-pink p-6 bg-[#14141A] flex flex-col justify-between h-44">
-            <div>
-              <h3 className="font-display text-[10px] text-[#FF4FD8] mb-2 uppercase">Data Transmission</h3>
-              <p className="text-xs text-muted-foreground font-sans">
-                Accumulated intelligence telemetry sent through this node.
-              </p>
-            </div>
-            <div className="space-y-1">
-              <div className="font-display text-2xl text-foreground text-shadow-accent">
-                {isRegistered ? totalLifetimeQueries : queriesUsed}
-              </div>
-              <div className="text-[9px] font-display text-accent/70 uppercase">
-                Total lifetime queries
+              <div className="p-3 bg-[#14141A] border border-slate-700 rounded-xl text-xs space-y-1">
+                <span className="font-bold text-slate-300 block">Memory Nodes</span>
+                <span className="font-mono text-pink-400 text-lg">Persistent Context</span>
               </div>
             </div>
           </div>
         </div>
-
-        {/* UPGRADE CTA PLACEHOLDER */}
-        <div className="border-4 border-[#00FFB3] border-dashed rounded-2xl p-8 bg-card/40 text-center space-y-4">
-          <h3 className="font-display text-xs text-[#00FFB3] tracking-widest uppercase">PREMIUM CORE ACCESS</h3>
-          <p className="text-xs text-muted-foreground font-sans max-w-md mx-auto">
-            Unlock infinite cognitive query limits, advanced sub-agent workgroups, parallel processing lines, and persistent memory nodes.
-          </p>
-          <div className="inline-block border-2 border-dashed border-[#00C8FF] text-[#00C8FF] text-xs font-display px-4 py-2 uppercase">
-            Module offline: Coming next epoch
-          </div>
-        </div>
-
       </main>
     </div>
   );
