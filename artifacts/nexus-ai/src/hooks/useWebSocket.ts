@@ -55,7 +55,7 @@ export function useWebSocket(options?: UseWebSocketOptions) {
     }
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = import.meta.env.VITE_WS_HOST || "localhost:3000";
+    const host = import.meta.env.VITE_WS_HOST || window.location.host;
     const wsUrl = `${protocol}//${host}/ws/chat`;
 
     const token = localStorage.getItem("nexus_token") || localStorage.getItem("clerk_session");

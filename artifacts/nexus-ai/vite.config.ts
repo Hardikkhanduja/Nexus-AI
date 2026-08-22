@@ -35,12 +35,12 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       "/ws/chat": {
-        target: "ws://127.0.0.1:3000",
+        target: "ws://127.0.0.1:8000",
         ws: true,
         changeOrigin: true,
       },
       "/api": {
-        target: "http://127.0.0.1:3000",
+        target: "http://127.0.0.1:8000",
         changeOrigin: true,
       },
     },

@@ -1,12 +1,14 @@
 import os
 import json
-import requests
+import logging
+import httpx
 from typing import AsyncGenerator, List, Dict, Any, Optional
 from dotenv import load_dotenv
 
 from backend.agents.providers.base import BaseProvider
 
 load_dotenv(override=True)
+logger = logging.getLogger(__name__)
 
 class GeminiProvider(BaseProvider):
     @property
@@ -29,7 +31,7 @@ class GeminiProvider(BaseProvider):
     ) -> str:
         api_key = self._get_api_key()
         if not api_key:
-            return f"[{self.name} Response: GEMINI_API_KEY is missing in your .env file]."
+            raise ValueError(f"[{self.name}] GEMINI_API_KEY is missing in environment.")
 
         combined_text = ""
         if system_prompt:
@@ -44,23 +46,25 @@ class GeminiProvider(BaseProvider):
             ]
         }
 
-        for m in ["gemini-1.5-flash", "gemini-2.0-flash"]:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={api_key}"
-            headers = {"Content-Type": "application/json"}
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            for m in ["gemini-1.5-flash", "gemini-2.0-flash"]:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={api_key}"
+                headers = {"Content-Type": "application/json"}
 
-            try:
-                res = requests.post(url, headers=headers, json=payload, timeout=20)
-                if res.status_code == 200:
-                    data = res.json()
-                    candidates = data.get("candidates", [])
-                    if candidates and "content" in candidates[0]:
-                        parts = candidates[0]["content"].get("parts", [])
-                        if parts and "text" in parts[0]:
-                            return parts[0]["text"]
-            except Exception:
-                pass
+                try:
+                    res = await client.post(url, headers=headers, json=payload)
+                    if res.status_code == 200:
+                        data = res.json()
+                        candidates = data.get("candidates", [])
+                        if candidates and "content" in candidates[0]:
+                            parts = candidates[0]["content"].get("parts", [])
+                            if parts and "text" in parts[0]:
+                                return parts[0]["text"].strip()
+                except Exception as e:
+                    logger.warning(f"Gemini model {m} generate error: {e}")
+                    continue
 
-        return f"Analyzing query perspective and evaluating trade-offs for {self.name} stance."
+        raise RuntimeError(f"Gemini API generation failed.")
 
     async def stream(
         self,
@@ -70,7 +74,7 @@ class GeminiProvider(BaseProvider):
     ) -> AsyncGenerator[str, None]:
         api_key = self._get_api_key()
         if not api_key:
-            yield "GEMINI_API_KEY is missing in your .env file."
+            yield f"[{self.name} Stream Error: GEMINI_API_KEY missing]."
             return
 
         combined_text = ""
@@ -86,29 +90,32 @@ class GeminiProvider(BaseProvider):
             ]
         }
 
-        for m in ["gemini-1.5-flash", "gemini-2.0-flash"]:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:streamGenerateContent?key={api_key}&alt=sse"
-            headers = {"Content-Type": "application/json"}
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                for m in ["gemini-1.5-flash", "gemini-2.0-flash"]:
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:streamGenerateContent?key={api_key}&alt=sse"
+                    headers = {"Content-Type": "application/json"}
 
-            try:
-                res = requests.post(url, headers=headers, json=payload, stream=True, timeout=30)
-                if res.status_code == 200:
-                    for line in res.iter_lines():
-                        if line:
-                            line_str = line.decode('utf-8')
-                            if line_str.startswith("data: "):
-                                data_json = line_str[6:].strip()
-                                try:
-                                    chunk = json.loads(data_json)
-                                    candidates = chunk.get("candidates", [])
-                                    if candidates and "content" in candidates[0]:
-                                        parts = candidates[0]["content"].get("parts", [])
-                                        if parts and "text" in parts[0]:
-                                            yield parts[0]["text"]
-                                except Exception:
-                                    pass
-                    return
-            except Exception:
-                pass
+                    try:
+                        async with client.stream("POST", url, headers=headers, json=payload) as response:
+                            if response.status_code == 200:
+                                async for line in response.aiter_lines():
+                                    if line.startswith("data: "):
+                                        data_json = line[6:].strip()
+                                        try:
+                                            chunk = json.loads(data_json)
+                                            candidates = chunk.get("candidates", [])
+                                            if candidates and "content" in candidates[0]:
+                                                parts = candidates[0]["content"].get("parts", [])
+                                                if parts and "text" in parts[0]:
+                                                    yield parts[0]["text"]
+                                        except Exception:
+                                            pass
+                                return
+                    except Exception as e:
+                        logger.warning(f"Gemini streaming error for {m}: {e}")
+                        continue
+        except Exception as e:
+            logger.error(f"Gemini stream exception: {e}")
 
-        yield "[Gemini Stream Error: Connection failed. Please check GEMINI_API_KEY in .env]."
+        yield "[Gemini Stream Error: Connection failed. Please check GEMINI_API_KEY]."

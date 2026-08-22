@@ -10,18 +10,18 @@ from backend.agents.providers.base import BaseProvider
 load_dotenv(override=True)
 logger = logging.getLogger(__name__)
 
-class OpenAIProvider(BaseProvider):
+class PerplexityProvider(BaseProvider):
     @property
     def name(self) -> str:
-        return "OpenAI"
+        return "Perplexity"
 
     @property
     def model(self) -> str:
-        return os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+        return os.environ.get("PERPLEXITY_MODEL", "sonar")
 
     def _get_api_key(self) -> str:
         load_dotenv(override=True)
-        return os.environ.get("OPENAI_API_KEY", "").strip()
+        return os.environ.get("PERPLEXITY_API_KEY", "").strip()
 
     async def generate(
         self,
@@ -31,9 +31,9 @@ class OpenAIProvider(BaseProvider):
     ) -> str:
         api_key = self._get_api_key()
         if not api_key:
-            raise ValueError(f"[{self.name}] OPENAI_API_KEY is missing in environment.")
+            raise ValueError(f"[{self.name}] PERPLEXITY_API_KEY is missing in environment.")
 
-        url = "https://api.openai.com/v1/chat/completions"
+        url = "https://api.perplexity.ai/chat/completions"
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
@@ -60,7 +60,7 @@ class OpenAIProvider(BaseProvider):
                 data = res.json()
                 return data["choices"][0]["message"]["content"].strip()
             else:
-                raise RuntimeError(f"OpenAI API Error ({res.status_code}): {res.text}")
+                raise RuntimeError(f"Perplexity API Error ({res.status_code}): {res.text}")
 
     async def stream(
         self,
@@ -70,10 +70,10 @@ class OpenAIProvider(BaseProvider):
     ) -> AsyncGenerator[str, None]:
         api_key = self._get_api_key()
         if not api_key:
-            yield f"[{self.name} Stream Error: OPENAI_API_KEY missing]."
+            yield f"[{self.name} Stream Error: PERPLEXITY_API_KEY missing]."
             return
 
-        url = "https://api.openai.com/v1/chat/completions"
+        url = "https://api.perplexity.ai/chat/completions"
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
@@ -114,5 +114,5 @@ class OpenAIProvider(BaseProvider):
                     else:
                         yield f"[{self.name} API Error {response.status_code}]"
         except Exception as e:
-            logger.error(f"OpenAI streaming error: {e}")
+            logger.error(f"Perplexity streaming error: {e}")
             yield f"[{self.name} Stream Error: {str(e)}]"

@@ -21,13 +21,6 @@ from backend.agents.orchestrator import MultiAgentOrchestrator
 
 logger = logging.getLogger("backend.websocket")
 
-def open_connection():
-    try:
-        return get_connection()
-    except Exception as exc:
-        logger.warning(f"Database connection temporary error: {exc}")
-        return None
-
 async def handle_chat_websocket(websocket: WebSocket):
     await websocket.accept()
     
@@ -40,7 +33,7 @@ async def handle_chat_websocket(websocket: WebSocket):
         user_info = verify_clerk_token(token)
         if user_info:
             user_db_record = get_or_create_user(user_info)
-            logger.info(f"Authenticated user: {user_db_record['email']} (Tier: {user_db_record['tier']})")
+            logger.info(f"Authenticated user: {user_db_record.get('email')} (Tier: {user_db_record.get('tier')})")
         else:
             logger.info("Unverified token; operating in guest mode.")
     else:
@@ -66,7 +59,7 @@ async def handle_chat_websocket(websocket: WebSocket):
             content = msg.get("content", "").strip()
             conversation_id = msg.get("conversationId")
             council_id = msg.get("councilId", "general")
-            provider_name = msg.get("provider", "gemini")
+            provider_name = msg.get("provider", "groq")
 
             if not content:
                 await websocket.send_json({"type": "error", "message": "Message content cannot be empty."})
@@ -81,16 +74,13 @@ async def handle_chat_websocket(websocket: WebSocket):
 
             # 3. Check Rate Limits
             await websocket.send_json({"type": "status", "message": "Checking usage limits..."})
-            conn_ctx = open_connection()
-            if conn_ctx:
-                try:
-                    with conn_ctx as conn:
-                        allowed, remaining, limit = await check_and_increment(conn, clerk_id, user_tier=user_tier)
-
-                except Exception:
-                    allowed, remaining, limit = await check_and_increment(None, clerk_id)
-            else:
-                allowed, remaining, limit = await check_and_increment(None, clerk_id)
+            allowed, remaining, limit = True, 10, 10
+            try:
+                with get_connection() as conn:
+                    allowed, remaining, limit = await check_and_increment(conn, clerk_id, user_tier=user_tier)
+            except Exception as exc:
+                logger.warning(f"Database rate-limit check fallback: {exc}")
+                allowed, remaining, limit = await check_and_increment(None, clerk_id, user_tier=user_tier)
 
             await websocket.send_json({"type": "rate_limit_status", "remaining": remaining, "limit": limit})
 
@@ -109,16 +99,31 @@ async def handle_chat_websocket(websocket: WebSocket):
                 council_id = "general"
 
             # 5. Get or Create Conversation in PostgreSQL
-            is_new_conversation = False
             if user_id:
                 if not conversation_id:
                     conversation_id = str(uuid.uuid4())
-                    is_new_conversation = True
-                    conn_ctx = open_connection()
-                    if conn_ctx:
-                        try:
-                            with conn_ctx as conn:
-                                with conn.cursor() as cur:
+                    try:
+                        with get_connection() as conn:
+                            with conn.cursor() as cur:
+                                cur.execute(
+                                    """
+                                    INSERT INTO conversations (id, user_id, clerk_id, title, created_at, updated_at)
+                                    VALUES (%s, %s, %s, %s, NOW(), NOW())
+                                    """,
+                                    (conversation_id, user_id, clerk_id, "New Discussion"),
+                                )
+                                conn.commit()
+                    except Exception as e:
+                        logger.error(f"Failed to create conversation in DB: {e}")
+                else:
+                    try:
+                        with get_connection() as conn:
+                            with conn.cursor() as cur:
+                                cur.execute(
+                                    "SELECT id FROM conversations WHERE id = %s AND clerk_id = %s",
+                                    (conversation_id, clerk_id),
+                                )
+                                if not cur.fetchone():
                                     cur.execute(
                                         """
                                         INSERT INTO conversations (id, user_id, clerk_id, title, created_at, updated_at)
@@ -127,36 +132,14 @@ async def handle_chat_websocket(websocket: WebSocket):
                                         (conversation_id, user_id, clerk_id, "New Discussion"),
                                     )
                                     conn.commit()
-                        except Exception as e:
-                            logger.error(f"Failed to create conversation in DB: {e}")
-                else:
-                    conn_ctx = open_connection()
-                    if conn_ctx:
-                        try:
-                            with conn_ctx as conn:
-                                with conn.cursor() as cur:
-                                    cur.execute(
-                                        "SELECT id FROM conversations WHERE id = %s AND clerk_id = %s",
-                                        (conversation_id, clerk_id),
-                                    )
-                                    if not cur.fetchone():
-                                        cur.execute(
-                                            """
-                                            INSERT INTO conversations (id, user_id, clerk_id, title, created_at, updated_at)
-                                            VALUES (%s, %s, %s, %s, NOW(), NOW())
-                                            """,
-                                            (conversation_id, user_id, clerk_id, "New Discussion"),
-                                        )
-                                        conn.commit()
-                                        is_new_conversation = True
-                        except Exception as e:
-                            logger.error(f"Failed to verify conversation in DB: {e}")
+                    except Exception as e:
+                        logger.error(f"Failed to verify conversation in DB: {e}")
             else:
                 if not conversation_id:
                     conversation_id = str(uuid.uuid4())
 
             # 6. Execute Multi-Agent Orchestration
-            orchestrator = MultiAgentOrchestrator(provider_name=provider_name)
+            orchestrator = MultiAgentOrchestrator(primary_provider=provider_name)
             final_synthesis_text = ""
             conflict_analysis_data = {}
 
@@ -173,37 +156,35 @@ async def handle_chat_websocket(websocket: WebSocket):
 
             # 7. Persist User Message & Assistant Response with JSONB Conflict Data
             if user_id and final_synthesis_text:
-                conn_ctx = open_connection()
-                if conn_ctx:
-                    try:
-                        user_msg_id = str(uuid.uuid4())
-                        assistant_msg_id = str(uuid.uuid4())
-                        with conn_ctx as conn:
-                            with conn.cursor() as cur:
-                                # Save user query
-                                cur.execute(
-                                    """
-                                    INSERT INTO messages (id, conversation_id, role, content, agent_name, created_at)
-                                    VALUES (%s, %s, 'user', %s, 'User', NOW())
-                                    """,
-                                    (user_msg_id, conversation_id, sanitized_content),
-                                )
-                                # Save synthesized response with JSONB conflict analysis
-                                cur.execute(
-                                    """
-                                    INSERT INTO messages (id, conversation_id, role, content, agent_name, conflict_analysis, created_at)
-                                    VALUES (%s, %s, 'assistant', %s, 'Nexus Synthesizer', %s, NOW())
-                                    """,
-                                    (assistant_msg_id, conversation_id, final_synthesis_text, json.dumps(conflict_analysis_data)),
-                                )
-                                # Update conversation timestamp
-                                cur.execute(
-                                    "UPDATE conversations SET updated_at = NOW() WHERE id = %s",
-                                    (conversation_id,),
-                                )
-                                conn.commit()
-                    except Exception as e:
-                        logger.error(f"Failed to persist messages to DB: {e}")
+                try:
+                    user_msg_id = str(uuid.uuid4())
+                    assistant_msg_id = str(uuid.uuid4())
+                    with get_connection() as conn:
+                        with conn.cursor() as cur:
+                            # Save user query
+                            cur.execute(
+                                """
+                                INSERT INTO messages (id, conversation_id, role, content, agent_name, created_at)
+                                VALUES (%s, %s, 'user', %s, 'User', NOW())
+                                """,
+                                (user_msg_id, conversation_id, sanitized_content),
+                            )
+                            # Save synthesized response with JSONB conflict analysis
+                            cur.execute(
+                                """
+                                INSERT INTO messages (id, conversation_id, role, content, agent_name, conflict_analysis, created_at)
+                                VALUES (%s, %s, 'assistant', %s, 'Nexus Synthesizer', %s, NOW())
+                                """,
+                                (assistant_msg_id, conversation_id, final_synthesis_text, json.dumps(conflict_analysis_data)),
+                            )
+                            # Update conversation timestamp
+                            cur.execute(
+                                "UPDATE conversations SET updated_at = NOW() WHERE id = %s",
+                                (conversation_id,),
+                            )
+                            conn.commit()
+                except Exception as e:
+                    logger.error(f"Failed to persist messages to DB: {e}")
 
             await websocket.send_json({"type": "status", "message": "Completed."})
 

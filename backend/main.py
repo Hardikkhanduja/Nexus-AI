@@ -1,5 +1,6 @@
 import os
 import logging
+from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -77,6 +78,51 @@ def db_health_check():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Database connection failed",
         )
+
+@app.get("/api/health/providers")
+def provider_health_check():
+    """Non-invasive check of API key configurations for active providers."""
+    providers = {
+        "perplexity": "configured" if os.environ.get("PERPLEXITY_API_KEY") else "missing_key",
+        "gemini": "configured" if os.environ.get("GEMINI_API_KEY") else "missing_key",
+        "groq": "configured" if os.environ.get("GROQ_API_KEY") else "missing_key",
+        "nvidia": "configured" if os.environ.get("NVIDIA_API_KEY") else "missing_key",
+        "openai": "configured" if os.environ.get("OPENAI_API_KEY") else "missing_key",
+        "anthropic": "configured" if os.environ.get("ANTHROPIC_API_KEY") else "missing_key",
+        "deepseek": "configured" if os.environ.get("DEEPSEEK_API_KEY") else "missing_key",
+    }
+    return {
+        "status": "ok",
+        "configured_count": sum(1 for v in providers.values() if v == "configured"),
+        "total_providers": len(providers),
+        "providers": providers
+    }
+
+@app.post("/api/ai/test-orchestration")
+async def test_orchestration_endpoint(payload: dict):
+    """
+    Controlled development endpoint for incremental testing:
+    1. Single model test
+    2. Parallel multi-agent orchestration
+    3. Category classification
+    """
+    import time
+    from backend.agents.orchestrator import MultiAgentOrchestrator
+    from backend.agents.routing import get_routing_for_category
+    
+    query = payload.get("query", "What are key trade-offs in Microservices?")
+    
+    orchestrator = MultiAgentOrchestrator()
+    
+    classification = await orchestrator.classify_domain(query)
+    
+    return {
+        "status": "success",
+        "tested_query": query,
+        "classification_result": classification,
+        "routing_assigned": get_routing_for_category(classification["category"]),
+        "timestamp": time.time()
+    }
 
 @app.get("/api/ai/councils")
 def list_councils(current_user: dict = Depends(get_current_user)):
@@ -212,18 +258,37 @@ async def generate_conversation_title(conversation_id: str, current_user: dict =
         logger.error(f"Failed to generate conversation title: {e}")
         return {"id": conversation_id, "title": "NEW CONVERSATION"}
 
-@app.get("/api/user/memory")
-async def get_user_memory(current_user: dict = Depends(get_current_user)):
-    """Fetch persistent user memory context for LLM prompt personalization."""
+@app.get("/api/user/usage")
+async def get_user_usage_endpoint(current_user: dict = Depends(get_current_user)):
+    """Fetch usage quota data for authenticated or guest users."""
     clerk_id = current_user.get("clerk_id", "guest")
+    tier = current_user.get("tier", "free")
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    
+    queries_used = 0
+    total_lifetime = 0
+    
+    if clerk_id != "guest":
+        try:
+            with get_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT queries_used_today FROM user_limits WHERE clerk_id = %s", (clerk_id,))
+                    row = cur.fetchone()
+                    if row:
+                        queries_used = row[0]
+                    cur.execute("SELECT COUNT(*) FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE clerk_id = %s) AND role = 'user'", (clerk_id,))
+                    total_lifetime = cur.fetchone()[0] or 0
+        except Exception as e:
+            logger.warning(f"Failed to query DB user usage: {e}")
+            
+    limit = 9999 if tier == "pro" else 30
     return {
-        "clerkId": clerk_id,
-        "preferences": {
-            "techStack": "React, Python, Fast API, PostgreSQL",
-            "communicationStyle": "Concise, empirical, code-first",
-            "domainFocus": "Full-Stack AI Engineering"
-        },
-        "personalizedPromptPrefix": "User prefers concise code-first solutions using TypeScript and Python."
+        "queriesUsedToday": queries_used,
+        "dailyQueryLimit": limit,
+        "totalLifetimeQueries": max(total_lifetime, queries_used),
+        "lastResetDate": today_str,
+        "isAuthenticated": clerk_id != "guest",
+        "plan": "Registered Agent" if clerk_id != "guest" else "Guest Sandbox"
     }
 
 @app.get("/api/ai/analytics")

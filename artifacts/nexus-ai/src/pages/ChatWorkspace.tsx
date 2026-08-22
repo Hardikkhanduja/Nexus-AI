@@ -362,23 +362,41 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
               );
             })}
 
-            {/* LIVE DEBATE BUBBLE */}
+            {/* LIVE DEBATE BUBBLE & THINKING ANIMATION */}
             {isStreaming && (
-              <div className="flex flex-col max-w-[90%] rounded-2xl border-2 border-[#FF4FD8] bg-[#FF4FD8]/5 text-[#FFEAF9] shadow-[3px_3px_0px_rgba(255,79,216,0.2)] p-4 self-start w-full">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-display text-[9px] text-[#FF4FD8] uppercase tracking-wider flex items-center gap-1.5">
-                    <Sparkles size={10} className="animate-pulse" /> Parallel Council Conversation in Progress...
+              <div className="flex flex-col max-w-[90%] rounded-2xl border-2 border-[#FF4FD8] bg-[#FF4FD8]/10 text-[#FFEAF9] shadow-[0_0_20px_rgba(255,79,216,0.25)] p-5 self-start w-full transition-all">
+                <div className="flex items-center justify-between mb-3 border-b border-[#FF4FD8]/30 pb-2">
+                  <span className="font-mono text-xs text-[#FF4FD8] uppercase tracking-wider flex items-center gap-2 font-bold">
+                    <Sparkles size={14} className="animate-spin text-[#00FFB3]" /> 
+                    {streamedContent ? "SYNTHESIZING MULTI-AGENT VERDICT..." : "COUNCIL IS THINKING & EVALUATING..."}
+                  </span>
+                  <span className="text-[10px] font-mono text-[#00FFB3] bg-[#00FFB3]/10 px-2 py-0.5 rounded border border-[#00FFB3]/30 animate-pulse">
+                    {status || "CLASSIFYING & QUERYING"}
                   </span>
                 </div>
+
+                {/* THINKING ANIMATION STATE */}
+                {!streamedContent && activeStances.length === 0 && (
+                  <div className="py-4 flex flex-col items-center justify-center gap-3 text-center">
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 bg-[#00C8FF] rounded-full animate-ping"></div>
+                      <div className="w-3 h-3 bg-[#00FFB3] rounded-full animate-ping" style={{ animationDelay: "200ms" }}></div>
+                      <div className="w-3 h-3 bg-[#FF4FD8] rounded-full animate-ping" style={{ animationDelay: "400ms" }}></div>
+                    </div>
+                    <p className="font-mono text-xs text-slate-300">
+                      Querying 3 Council Personas in parallel (<span className="text-[#00C8FF]">Fact-Checker</span>, <span className="text-[#00FFB3]">Optimist</span>, <span className="text-[#FF4FD8]">Skeptic</span>)...
+                    </p>
+                  </div>
+                )}
 
                 {activeStances.length > 0 && (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
                     {activeStances.map((s) => (
-                      <div key={s.role_id} className="p-2 bg-slate-900/80 border border-slate-800 rounded text-xs">
-                        <div className="font-bold text-slate-200 flex items-center gap-1">
+                      <div key={s.role_id} className="p-2.5 bg-slate-950/90 border border-slate-800 rounded-lg text-xs shadow-inner">
+                        <div className="font-bold text-slate-200 flex items-center gap-1.5 mb-1">
                           <span>{s.icon}</span> {s.role_name}
                         </div>
-                        <p className="text-[10px] text-slate-400 line-clamp-2 mt-1">{s.content}</p>
+                        <p className="text-[10px] text-slate-400 line-clamp-3 leading-relaxed">{s.content}</p>
                       </div>
                     ))}
                   </div>
@@ -389,13 +407,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
                     <ReactMarkdown remarkPlugins={[remarkGfm]} components={MarkdownComponents as any}>
                       {streamedContent}
                     </ReactMarkdown>
-                  ) : (
-                    <div className="flex items-center gap-1.5 py-1">
-                      <div className="w-1.5 h-1.5 bg-[#FF4FD8] rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
-                      <div className="w-1.5 h-1.5 bg-[#FF4FD8] rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
-                      <div className="w-1.5 h-1.5 bg-[#FF4FD8] rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
-                    </div>
-                  )}
+                  ) : null}
                 </div>
 
                 {liveConflictAnalysis && (

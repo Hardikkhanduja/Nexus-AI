@@ -1,12 +1,14 @@
 import os
 import json
-import requests
+import logging
+import httpx
 from typing import AsyncGenerator, List, Dict, Any, Optional
 from dotenv import load_dotenv
 
 from backend.agents.providers.base import BaseProvider
 
 load_dotenv(override=True)
+logger = logging.getLogger(__name__)
 
 class GroqProvider(BaseProvider):
     @property
@@ -29,7 +31,7 @@ class GroqProvider(BaseProvider):
     ) -> str:
         api_key = self._get_api_key()
         if not api_key:
-            return f"[{self.name} Response: GROQ_API_KEY is missing in your .env file]."
+            raise ValueError(f"[{self.name}] GROQ_API_KEY is missing in environment.")
 
         url = "https://api.groq.com/openai/v1/chat/completions"
         headers = {
@@ -45,23 +47,25 @@ class GroqProvider(BaseProvider):
                 messages.append({"role": m.get("role", "user"), "content": m.get("content", "")})
         messages.append({"role": "user", "content": prompt})
 
-        for target_model in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192"]:
-            payload = {
-                "model": target_model,
-                "messages": messages,
-                "temperature": 0.7,
-                "max_tokens": 2048
-            }
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            for target_model in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192"]:
+                payload = {
+                    "model": target_model,
+                    "messages": messages,
+                    "temperature": 0.7,
+                    "max_tokens": 2048
+                }
 
-            try:
-                res = requests.post(url, headers=headers, json=payload, timeout=15)
-                if res.status_code == 200:
-                    data = res.json()
-                    return data["choices"][0]["message"]["content"]
-            except Exception:
-                pass
+                try:
+                    res = await client.post(url, headers=headers, json=payload)
+                    if res.status_code == 200:
+                        data = res.json()
+                        return data["choices"][0]["message"]["content"].strip()
+                except Exception as e:
+                    logger.warning(f"Groq generate error on {target_model}: {e}")
+                    continue
 
-        return "Analyzing query perspective and evaluating trade-offs for Groq stance."
+        raise RuntimeError("Groq API generation failed.")
 
     async def stream(
         self,
@@ -71,7 +75,7 @@ class GroqProvider(BaseProvider):
     ) -> AsyncGenerator[str, None]:
         api_key = self._get_api_key()
         if not api_key:
-            yield "GROQ_API_KEY is missing in your .env file."
+            yield f"[{self.name} Stream Error: GROQ_API_KEY missing]."
             return
 
         url = "https://api.groq.com/openai/v1/chat/completions"
@@ -88,34 +92,37 @@ class GroqProvider(BaseProvider):
                 messages.append({"role": m.get("role", "user"), "content": m.get("content", "")})
         messages.append({"role": "user", "content": prompt})
 
-        for target_model in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192"]:
-            payload = {
-                "model": target_model,
-                "messages": messages,
-                "temperature": 0.7,
-                "max_tokens": 2048,
-                "stream": True
-            }
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                for target_model in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192"]:
+                    payload = {
+                        "model": target_model,
+                        "messages": messages,
+                        "temperature": 0.7,
+                        "max_tokens": 2048,
+                        "stream": True
+                    }
 
-            try:
-                res = requests.post(url, headers=headers, json=payload, stream=True, timeout=30)
-                if res.status_code == 200:
-                    for line in res.iter_lines():
-                        if line:
-                            line_str = line.decode('utf-8')
-                            if line_str.startswith("data: "):
-                                data_content = line_str[6:].strip()
-                                if data_content == "[DONE]":
-                                    break
-                                try:
-                                    chunk_json = json.loads(data_content)
-                                    delta = chunk_json["choices"][0]["delta"].get("content", "")
-                                    if delta:
-                                        yield delta
-                                except Exception:
-                                    pass
-                    return
-            except Exception:
-                pass
+                    try:
+                        async with client.stream("POST", url, headers=headers, json=payload) as response:
+                            if response.status_code == 200:
+                                async for line in response.aiter_lines():
+                                    if line.startswith("data: "):
+                                        data_content = line[6:].strip()
+                                        if data_content == "[DONE]":
+                                            break
+                                        try:
+                                            chunk_json = json.loads(data_content)
+                                            delta = chunk_json["choices"][0]["delta"].get("content", "")
+                                            if delta:
+                                                yield delta
+                                        except Exception:
+                                            pass
+                                return
+                    except Exception as e:
+                        logger.warning(f"Groq stream error on {target_model}: {e}")
+                        continue
+        except Exception as e:
+            logger.error(f"Groq stream exception: {e}")
 
         yield "[Groq Stream: Completing multi-agent synthesis.]"
