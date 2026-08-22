@@ -147,6 +147,7 @@ async def handle_chat_websocket(websocket: WebSocket):
             final_synthesis_text = ""
             conflict_analysis_data = {}
             detected_category = "general_knowledge"
+            collected_agent_stances = []
 
             async for event in orchestrator.run_debate_and_synthesize(
                 user_query=sanitized_content,
@@ -155,6 +156,8 @@ async def handle_chat_websocket(websocket: WebSocket):
                 event["conversationId"] = conversation_id
                 if event.get("category"):
                     detected_category = event.get("category")
+                if event.get("type") == "agent_stances_complete":
+                    collected_agent_stances = event.get("agent_responses", [])
                 await websocket.send_json(event)
                 
                 if event.get("type") == "debate_complete":
@@ -163,7 +166,7 @@ async def handle_chat_websocket(websocket: WebSocket):
 
             latency_ms = int((time.time() - start_time) * 1000)
 
-            # 7. Persist User Message & Assistant Response with real analytics metrics
+            # 7. Persist User Message, Persona Stances, & Synthesized Response with real analytics metrics
             if user_id and final_synthesis_text:
                 try:
                     user_msg_id = str(uuid.uuid4())
@@ -178,6 +181,34 @@ async def handle_chat_websocket(websocket: WebSocket):
                                 """,
                                 (user_msg_id, conversation_id, sanitized_content, detected_category),
                             )
+
+                            # Save each individual council persona response with its real provider
+                            for stance in collected_agent_stances:
+                                stance_msg_id = str(uuid.uuid4())
+                                p_used = stance.get("provider_used", "groq").lower()
+                                lat_str = str(stance.get("latency", "1.0s")).replace("s", "").strip()
+                                try:
+                                    p_lat_ms = int(float(lat_str) * 1000)
+                                except:
+                                    p_lat_ms = 1000
+
+                                cur.execute(
+                                    """
+                                    INSERT INTO messages (id, conversation_id, role, content, agent_name, category, persona_role, provider, latency_ms, was_fallback, created_at)
+                                    VALUES (%s, %s, 'assistant', %s, %s, %s, %s, %s, %s, false, NOW())
+                                    """,
+                                    (
+                                        stance_msg_id,
+                                        conversation_id,
+                                        stance.get("content", ""),
+                                        stance.get("role_name", "Council Agent"),
+                                        detected_category,
+                                        stance.get("role_id", "persona"),
+                                        p_used,
+                                        p_lat_ms,
+                                    ),
+                                )
+
                             # Save synthesized response with role, provider, latency, and conflict analysis
                             cur.execute(
                                 """

@@ -37,7 +37,13 @@ const AuthContext = createContext<AuthContextType | null>(null);
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
 function getToken(): string | null {
-  return localStorage.getItem("nexus_token");
+  const localToken = localStorage.getItem("nexus_token") || localStorage.getItem("clerk_session");
+  if (localToken) return localToken;
+  try {
+    const clerkToken = (window as any).Clerk?.session?.getToken();
+    if (clerkToken) return clerkToken;
+  } catch {}
+  return null;
 }
 
 function setToken(token: string): void {

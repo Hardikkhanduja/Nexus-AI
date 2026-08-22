@@ -240,31 +240,51 @@ class MultiAgentOrchestrator:
             f"Second, synthesize the absolute best, most comprehensive guidance combining the strengths of all stances into a structured Markdown response."
         )
 
-        try:
-            synthesizer_provider = get_provider("groq")
-            synthesizer_text_parts = []
-            
-            async for chunk in synthesizer_provider.stream(synthesis_prompt, context=context):
-                synthesizer_text_parts.append(chunk)
-                yield {
-                    "type": "synthesizer_chunk",
-                    "content": chunk
-                }
+        # Fallback chain for Synthesizer: Groq -> Gemini -> Perplexity -> NVIDIA
+        synthesis_providers = ["groq", "gemini", "perplexity", "nvidia"]
+        synthesis_success = False
 
-            full_raw_text = "".join(synthesizer_text_parts)
-            conflict_data = self._extract_conflict_json(full_raw_text, cleaned_agent_results)
-            
-            # Clean out the raw ```json ... ``` block from user-facing text
-            clean_user_text = re.sub(r"```json[\s\S]*?```", "", full_raw_text).strip()
+        for provider_name in synthesis_providers:
+            try:
+                logger.info(f"Attempting multi-agent synthesis using provider: '{provider_name}'...")
+                synthesizer_provider = get_provider(provider_name)
+                synthesizer_text_parts = []
+                
+                async for chunk in synthesizer_provider.stream(synthesis_prompt, context=context):
+                    # Filter out error placeholders from failed providers
+                    if chunk and not chunk.startswith("[") and not "Stream Error" in chunk and not "Completing multi-agent" in chunk:
+                        synthesizer_text_parts.append(chunk)
+                        yield {
+                            "type": "synthesizer_chunk",
+                            "content": chunk
+                        }
 
-            yield {
-                "type": "debate_complete",
-                "full_text": clean_user_text,
-                "conflict_analysis": conflict_data
-            }
+                full_raw_text = "".join(synthesizer_text_parts).strip()
+                if full_raw_text and len(full_raw_text) > 30:
+                    synthesis_success = True
+                    conflict_data = self._extract_conflict_json(full_raw_text, cleaned_agent_results)
+                    clean_user_text = re.sub(r"```json[\s\S]*?```", "", full_raw_text).strip()
 
-        except Exception as e:
-            logger.error(f"Error during synthesis: {e}")
+                    yield {
+                        "type": "debate_complete",
+                        "full_text": clean_user_text,
+                        "conflict_analysis": conflict_data
+                    }
+                    break
+                else:
+                    logger.error(
+                        f"[SYNTHESIZER DIAGNOSTIC] Provider '{provider_name}' returned empty or incomplete text: '{full_raw_text[:100]}'. Trying next provider..."
+                    )
+            except Exception as e:
+                logger.error(
+                    f"[SYNTHESIZER DIAGNOSTIC EXCEPTION] Provider '{provider_name}' failed during synthesis stream! "
+                    f"Type: {type(e).__name__}, Message: {str(e)}",
+                    exc_info=True
+                )
+                continue
+
+        if not synthesis_success:
+            logger.error("[SYNTHESIZER CRITICAL] All synthesis providers in fallback chain failed! Emitting raw agent responses.")
             yield {
                 "type": "debate_complete",
                 "full_text": "\n\n".join([f"**{r['role_name']}**: {r['content']}" for r in cleaned_agent_results]),

@@ -1,18 +1,20 @@
 """
-Server-side rate limiting backed by PostgreSQL (user_limits table).
-Free Tier: 10 queries/day limit.
-Pro Tier: Unlimited queries/day.
+Server-side rate limiting backed by PostgreSQL (user_limits table) and Server-side Guest IP tracking.
+Single Source of Truth for Nexus AI Quota Enforcement.
 """
 
 import logging
 from datetime import timezone, datetime
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict
 import psycopg2.extensions
+
+from backend.config import GUEST_DAILY_LIMIT, REGISTERED_FREE_DAILY_LIMIT, PRO_DAILY_LIMIT
 
 logger = logging.getLogger(__name__)
 
-FREE_DAILY_LIMIT = 10
-PRO_DAILY_LIMIT = 999999  # Unlimited
+# Server-side Guest IP rate tracking memory cache
+# Key: (ip_address, date_str), Value: count
+_GUEST_IP_CACHE: Dict[Tuple[str, str], int] = {}
 
 def is_valid_uuid(val: str) -> bool:
     try:
@@ -22,20 +24,40 @@ def is_valid_uuid(val: str) -> bool:
     except ValueError:
         return False
 
+def check_guest_ip_limit(client_ip: str) -> Tuple[bool, int, int]:
+    """Server-side IP rate tracking for guest users."""
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    cache_key = (client_ip or "127.0.0.1", today_str)
+
+    # Clean up stale cache keys from previous days
+    stale_keys = [k for k in _GUEST_IP_CACHE.keys() if k[1] != today_str]
+    for k in stale_keys:
+        _GUEST_IP_CACHE.pop(k, None)
+
+    used = _GUEST_IP_CACHE.get(cache_key, 0)
+    if used >= GUEST_DAILY_LIMIT:
+        return False, 0, GUEST_DAILY_LIMIT
+
+    _GUEST_IP_CACHE[cache_key] = used + 1
+    remaining = GUEST_DAILY_LIMIT - (used + 1)
+    return True, remaining, GUEST_DAILY_LIMIT
+
 async def check_and_increment(
     conn: Optional[psycopg2.extensions.connection],
     clerk_id: Optional[str],
-    user_tier: str = "free"
+    user_tier: str = "free",
+    client_ip: str = "127.0.0.1"
 ) -> Tuple[bool, int, int]:
     """
     Checks rate limit based on user tier.
-    Free tier = 10 queries/day.
-    Pro tier = Unlimited.
+    Guest = 5 queries/day (enforced server-side by IP).
+    Free Registered = 30 queries/day.
+    Pro Tier = Unlimited.
     """
-    daily_limit = PRO_DAILY_LIMIT if user_tier == "pro" else FREE_DAILY_LIMIT
-
     if not clerk_id or clerk_id == "guest":
-        return True, FREE_DAILY_LIMIT, FREE_DAILY_LIMIT
+        return check_guest_ip_limit(client_ip)
+
+    daily_limit = PRO_DAILY_LIMIT if user_tier == "pro" else REGISTERED_FREE_DAILY_LIMIT
 
     if conn is None:
         return True, daily_limit, daily_limit
@@ -85,12 +107,12 @@ async def check_and_increment(
                     (clerk_id,),
                 )
                 conn.commit()
-                return True, 9999, 9999
+                return True, PRO_DAILY_LIMIT, PRO_DAILY_LIMIT
 
-            # Free Tier = Cap at 10
-            if queries_used >= FREE_DAILY_LIMIT:
+            # Registered Free Tier = Cap at REGISTERED_FREE_DAILY_LIMIT (30)
+            if queries_used >= REGISTERED_FREE_DAILY_LIMIT:
                 conn.commit()
-                return False, 0, FREE_DAILY_LIMIT
+                return False, 0, REGISTERED_FREE_DAILY_LIMIT
 
             # Increment count
             cur.execute(
@@ -99,8 +121,8 @@ async def check_and_increment(
             )
             conn.commit()
 
-            remaining = FREE_DAILY_LIMIT - (queries_used + 1)
-            return True, max(remaining, 0), FREE_DAILY_LIMIT
+            remaining = REGISTERED_FREE_DAILY_LIMIT - (queries_used + 1)
+            return True, max(remaining, 0), REGISTERED_FREE_DAILY_LIMIT
     except Exception as exc:
         logger.warning(f"Rate-limit check error: {exc}")
         return True, daily_limit, daily_limit

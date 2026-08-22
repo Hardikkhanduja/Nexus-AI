@@ -21,7 +21,14 @@ class NvidiaProvider(BaseProvider):
 
     def _get_api_key(self) -> str:
         load_dotenv(override=True)
-        return os.environ.get("NVIDIA_API_KEY", "").strip()
+        key = os.environ.get("NVIDIA_API_KEY", "").strip()
+        if key:
+            prefix = key[:4]
+            suffix = key[-4:] if len(key) >= 8 else key
+            logger.info(f"NVIDIA_API_KEY found: {prefix}...{suffix}")
+        else:
+            logger.error("NVIDIA_API_KEY: NOT SET")
+        return key
 
     async def generate(
         self,
@@ -47,20 +54,42 @@ class NvidiaProvider(BaseProvider):
                 messages.append({"role": m.get("role", "user"), "content": m.get("content", "")})
         messages.append({"role": "user", "content": prompt})
 
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": 0.7,
-            "max_tokens": 1500
-        }
+        # Confirmed live NVIDIA NIM model IDs
+        live_nvidia_models = [
+            os.environ.get("NVIDIA_MODEL", "meta/llama-3.3-70b-instruct"),
+            "meta/llama-3.1-70b-instruct",
+            "nvidia/llama-3.1-nemotron-70b-instruct",
+            "nvidia/nemotron-4-340b-instruct",
+            "meta/llama-3.1-8b-instruct"
+        ]
 
         async with httpx.AsyncClient(timeout=25.0) as client:
-            res = await client.post(url, headers=headers, json=payload)
-            if res.status_code == 200:
-                data = res.json()
-                return data["choices"][0]["message"]["content"].strip()
-            else:
-                raise RuntimeError(f"NVIDIA NIM API Error ({res.status_code}): {res.text}")
+            for target_model in live_nvidia_models:
+                payload = {
+                    "model": target_model,
+                    "messages": messages,
+                    "temperature": 0.7,
+                    "max_tokens": 1500
+                }
+                try:
+                    res = await client.post(url, headers=headers, json=payload)
+                    if res.status_code == 200:
+                        data = res.json()
+                        return data["choices"][0]["message"]["content"].strip()
+                    else:
+                        logger.error(
+                            f"[DIAGNOSTIC ERROR] NVIDIA NIM generate failed on model '{target_model}'. "
+                            f"HTTP Status: {res.status_code}, Response Body: {res.text}"
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"[DIAGNOSTIC EXCEPTION] NVIDIA NIM generate exception on model '{target_model}': "
+                        f"Type: {type(e).__name__}, Message: {str(e)}",
+                        exc_info=True
+                    )
+                    continue
+
+        raise RuntimeError("NVIDIA NIM API generation failed.")
 
     async def stream(
         self,
@@ -87,32 +116,54 @@ class NvidiaProvider(BaseProvider):
                 messages.append({"role": m.get("role", "user"), "content": m.get("content", "")})
         messages.append({"role": "user", "content": prompt})
 
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": 0.7,
-            "max_tokens": 2048,
-            "stream": True
-        }
+        live_nvidia_models = [
+            os.environ.get("NVIDIA_MODEL", "meta/llama-3.3-70b-instruct"),
+            "meta/llama-3.1-70b-instruct",
+            "nvidia/llama-3.1-nemotron-70b-instruct",
+            "nvidia/nemotron-4-340b-instruct",
+            "meta/llama-3.1-8b-instruct"
+        ]
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                async with client.stream("POST", url, headers=headers, json=payload) as response:
-                    if response.status_code == 200:
-                        async for line in response.aiter_lines():
-                            if line.startswith("data: "):
-                                data_str = line[6:].strip()
-                                if data_str == "[DONE]":
-                                    break
-                                try:
-                                    chunk = json.loads(data_str)
-                                    delta = chunk["choices"][0]["delta"].get("content", "")
-                                    if delta:
-                                        yield delta
-                                except Exception:
-                                    pass
-                    else:
-                        yield f"[{self.name} API Error {response.status_code}]"
+                for target_model in live_nvidia_models:
+                    payload = {
+                        "model": target_model,
+                        "messages": messages,
+                        "temperature": 0.7,
+                        "max_tokens": 2048,
+                        "stream": True
+                    }
+
+                    try:
+                        async with client.stream("POST", url, headers=headers, json=payload) as response:
+                            if response.status_code == 200:
+                                async for line in response.aiter_lines():
+                                    if line.startswith("data: "):
+                                        data_str = line[6:].strip()
+                                        if data_str == "[DONE]":
+                                            break
+                                        try:
+                                            chunk = json.loads(data_str)
+                                            delta = chunk["choices"][0]["delta"].get("content", "")
+                                            if delta:
+                                                yield delta
+                                        except Exception:
+                                            pass
+                                return
+                            else:
+                                error_body = await response.aread()
+                                logger.error(
+                                    f"[DIAGNOSTIC ERROR] NVIDIA NIM stream failed on model '{target_model}'. "
+                                    f"HTTP Status: {response.status_code}, Response Body: {error_body.decode('utf-8', errors='ignore')}"
+                                )
+                    except Exception as e:
+                        logger.error(
+                            f"[DIAGNOSTIC EXCEPTION] NVIDIA NIM streaming error on model '{target_model}': "
+                            f"Type: {type(e).__name__}, Message: {str(e)}",
+                            exc_info=True
+                        )
+                        continue
         except Exception as e:
-            logger.error(f"NVIDIA NIM streaming error: {e}")
+            logger.error(f"[DIAGNOSTIC EXCEPTION] NVIDIA NIM outer stream exception: Type: {type(e).__name__}, Message: {str(e)}", exc_info=True)
             yield f"[{self.name} Stream Error: {str(e)}]"

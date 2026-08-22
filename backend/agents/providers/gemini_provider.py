@@ -21,7 +21,14 @@ class GeminiProvider(BaseProvider):
 
     def _get_api_key(self) -> str:
         load_dotenv(override=True)
-        return os.environ.get("GEMINI_API_KEY", "").strip()
+        key = os.environ.get("GEMINI_API_KEY", "").strip()
+        if key:
+            prefix = key[:4]
+            suffix = key[-4:] if len(key) >= 8 else key
+            logger.info(f"GEMINI_API_KEY found: {prefix}...{suffix}")
+        else:
+            logger.error("GEMINI_API_KEY: NOT SET")
+        return key
 
     async def generate(
         self,
@@ -46,8 +53,11 @@ class GeminiProvider(BaseProvider):
             ]
         }
 
+        # Confirmed live Gemini model IDs
+        live_gemini_models = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
+
         async with httpx.AsyncClient(timeout=20.0) as client:
-            for m in ["gemini-1.5-flash", "gemini-2.0-flash"]:
+            for m in live_gemini_models:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={api_key}"
                 headers = {"Content-Type": "application/json"}
 
@@ -60,8 +70,17 @@ class GeminiProvider(BaseProvider):
                             parts = candidates[0]["content"].get("parts", [])
                             if parts and "text" in parts[0]:
                                 return parts[0]["text"].strip()
+                    else:
+                        logger.error(
+                            f"[DIAGNOSTIC ERROR] Gemini generate failed on model '{m}'. "
+                            f"HTTP Status: {res.status_code}, Response Body: {res.text}"
+                        )
                 except Exception as e:
-                    logger.warning(f"Gemini model {m} generate error: {e}")
+                    logger.error(
+                        f"[DIAGNOSTIC EXCEPTION] Gemini generate exception on model '{m}': "
+                        f"Type: {type(e).__name__}, Message: {str(e)}",
+                        exc_info=True
+                    )
                     continue
 
         raise RuntimeError(f"Gemini API generation failed.")
@@ -90,9 +109,11 @@ class GeminiProvider(BaseProvider):
             ]
         }
 
+        live_gemini_models = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
+
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                for m in ["gemini-1.5-flash", "gemini-2.0-flash"]:
+                for m in live_gemini_models:
                     url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:streamGenerateContent?key={api_key}&alt=sse"
                     headers = {"Content-Type": "application/json"}
 
@@ -112,10 +133,20 @@ class GeminiProvider(BaseProvider):
                                         except Exception:
                                             pass
                                 return
+                            else:
+                                error_body = await response.aread()
+                                logger.error(
+                                    f"[DIAGNOSTIC ERROR] Gemini stream failed on model '{m}'. "
+                                    f"HTTP Status: {response.status_code}, Response Body: {error_body.decode('utf-8', errors='ignore')}"
+                                )
                     except Exception as e:
-                        logger.warning(f"Gemini streaming error for {m}: {e}")
+                        logger.error(
+                            f"[DIAGNOSTIC EXCEPTION] Gemini stream error for model '{m}': "
+                            f"Type: {type(e).__name__}, Message: {str(e)}",
+                            exc_info=True
+                        )
                         continue
         except Exception as e:
-            logger.error(f"Gemini stream exception: {e}")
+            logger.error(f"[DIAGNOSTIC EXCEPTION] Gemini outer stream exception: Type: {type(e).__name__}, Message: {str(e)}", exc_info=True)
 
         yield "[Gemini Stream Error: Connection failed. Please check GEMINI_API_KEY]."

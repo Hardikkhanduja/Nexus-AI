@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, WebSocket, Header, HTTPException, Depends, status
+from fastapi import FastAPI, WebSocket, Header, HTTPException, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
@@ -258,6 +258,9 @@ async def generate_conversation_title(conversation_id: str, current_user: dict =
         logger.error(f"Failed to generate conversation title: {e}")
         return {"id": conversation_id, "title": "NEW CONVERSATION"}
 
+from backend.config import GUEST_DAILY_LIMIT, REGISTERED_FREE_DAILY_LIMIT, PRO_DAILY_LIMIT
+from backend.rate_limit.limiter import check_and_increment
+
 @app.get("/api/user/usage")
 async def get_user_usage_endpoint(current_user: dict = Depends(get_current_user)):
     """Fetch usage quota data for authenticated or guest users."""
@@ -276,19 +279,45 @@ async def get_user_usage_endpoint(current_user: dict = Depends(get_current_user)
                     row = cur.fetchone()
                     if row:
                         queries_used = row[0]
-                    cur.execute("SELECT COUNT(*) FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE clerk_id = %s) AND role = 'user'", (clerk_id,))
+                    cur.execute(
+                        """
+                        SELECT COUNT(*) FROM messages 
+                        WHERE conversation_id IN (
+                            SELECT id FROM conversations WHERE clerk_id = %s OR user_id IN (SELECT id FROM users WHERE clerk_id = %s)
+                        ) 
+                        AND role = 'user'
+                        """,
+                        (clerk_id, clerk_id),
+                    )
                     total_lifetime = cur.fetchone()[0] or 0
         except Exception as e:
             logger.warning(f"Failed to query DB user usage: {e}")
             
-    limit = 9999 if tier == "pro" else 30
+    limit = PRO_DAILY_LIMIT if tier == "pro" else (REGISTERED_FREE_DAILY_LIMIT if clerk_id != "guest" else GUEST_DAILY_LIMIT)
     return {
         "queriesUsedToday": queries_used,
         "dailyQueryLimit": limit,
         "totalLifetimeQueries": max(total_lifetime, queries_used),
         "lastResetDate": today_str,
         "isAuthenticated": clerk_id != "guest",
-        "plan": "Registered Agent" if clerk_id != "guest" else "Guest Sandbox"
+        "plan": "Pro Agent" if tier == "pro" else ("Registered Agent" if clerk_id != "guest" else "Guest Sandbox")
+    }
+
+@app.post("/api/user/query-increment")
+async def increment_user_query_endpoint(request: Request, current_user: dict = Depends(get_current_user)):
+    """Dedicated query increment endpoint for live quota updates."""
+    clerk_id = current_user.get("clerk_id", "guest")
+    tier = current_user.get("tier", "free")
+    client_ip = request.client.host if request.client else "127.0.0.1"
+
+    with get_connection() as conn:
+        allowed, remaining, limit = await check_and_increment(conn, clerk_id, user_tier=tier, client_ip=client_ip)
+
+    return {
+        "allowed": allowed,
+        "remaining": remaining,
+        "queriesUsedToday": limit - remaining if limit > 0 else 0,
+        "limit": limit
     }
 
 @app.get("/api/ai/analytics")
