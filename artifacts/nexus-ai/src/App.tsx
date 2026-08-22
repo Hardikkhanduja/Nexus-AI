@@ -10,6 +10,12 @@ import { Sidebar } from "@/components/Sidebar";
 import LandingPage from "@/pages/LandingPage";
 import ChatWorkspace from "@/pages/ChatWorkspace";
 import PlaceholderPage from "@/pages/PlaceholderPage";
+import HistoryPage from "@/pages/HistoryPage";
+import AnalyticsPage from "@/pages/AnalyticsPage";
+import PerformancePage from "@/pages/PerformancePage";
+import SavedPage from "@/pages/SavedPage";
+import DocsPage from "@/pages/DocsPage";
+import FeedbackPage from "@/pages/FeedbackPage";
 import LoginPage from "@/pages/LoginPage";
 import SignUpPage from "@/pages/SignUpPage";
 import ProfilePage from "@/pages/ProfilePage";
@@ -43,22 +49,16 @@ function AppRouter() {
           </Route>
 
           <Route path="/history">
-            <PlaceholderPage title="CHAT HISTORY" onOpenSidebar={openSidebar} />
+            <HistoryPage onOpenSidebar={openSidebar} />
           </Route>
           <Route path="/analytics">
-            <PlaceholderPage title="ANALYTICS" onOpenSidebar={openSidebar} />
+            <AnalyticsPage onOpenSidebar={openSidebar} />
           </Route>
           <Route path="/performance">
-            <PlaceholderPage
-              title="AGENT PERFORMANCE"
-              onOpenSidebar={openSidebar}
-            />
+            <PerformancePage onOpenSidebar={openSidebar} />
           </Route>
           <Route path="/saved">
-            <PlaceholderPage
-              title="SAVED CONVERSATIONS"
-              onOpenSidebar={openSidebar}
-            />
+            <SavedPage onOpenSidebar={openSidebar} />
           </Route>
 
           {/* Login Routes & Callbacks */}
@@ -102,13 +102,10 @@ function AppRouter() {
             <UsagePage onOpenSidebar={openSidebar} />
           </Route>
           <Route path="/docs">
-            <PlaceholderPage
-              title="DOCUMENTATION"
-              onOpenSidebar={openSidebar}
-            />
+            <DocsPage onOpenSidebar={openSidebar} />
           </Route>
           <Route path="/feedback">
-            <PlaceholderPage title="FEEDBACK" onOpenSidebar={openSidebar} />
+            <FeedbackPage onOpenSidebar={openSidebar} />
           </Route>
           <Route path="/logout">
             <PlaceholderPage title="LOGOUT" onOpenSidebar={openSidebar} />

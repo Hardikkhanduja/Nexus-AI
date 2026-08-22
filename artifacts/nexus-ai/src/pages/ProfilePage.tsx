@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
+import { SignedIn, UserButton } from "@clerk/clerk-react";
 
 interface ProfilePageProps {
   onOpenSidebar: () => void;
@@ -113,20 +114,30 @@ export default function ProfilePage({ onOpenSidebar }: ProfilePageProps) {
   return (
     <div className="h-[100dvh] w-full flex flex-col relative overflow-hidden bg-[#0D0D12]" data-testid="page-profile">
       {/* HEADER */}
-      <header className="h-16 flex items-center justify-between px-6 border-b border-[#00C8FF]/20 bg-[#0D0D12]/80 backdrop-blur-sm z-10 shrink-0">
-        <div className="flex items-center gap-4">
+      <header className="h-16 flex items-center justify-between px-6 border-b-[3px] border-[#00C8FF] bg-[#0D0D12] shrink-0 z-10 w-full">
+        <div className="flex items-center gap-4 min-w-0">
           <button
             onClick={onOpenSidebar}
-            className="p-1 text-[#00C8FF] hover:bg-[#00C8FF]/10 transition-colors rounded-sm"
+            className="p-2 border-2 border-primary/50 rounded-lg hover:border-primary hover:shadow-[2px_2px_0px_#00FFB3] transition-all bg-[#14141A] cursor-pointer"
             data-testid="button-open-sidebar-profile"
           >
-            <div className="flex flex-col gap-[3px] w-5">
-              <div className="h-[2px] bg-[#00C8FF] w-full shadow-[0_0_4px_currentColor]"></div>
-              <div className="h-[2px] bg-[#00C8FF] w-full shadow-[0_0_4px_currentColor]"></div>
-              <div className="h-[2px] bg-[#00C8FF] w-full shadow-[0_0_4px_currentColor]"></div>
+            <div className="flex flex-col gap-[4px] w-[24px]">
+              <div className="h-[3px] bg-[#00FFB3] w-full rounded-full"></div>
+              <div className="h-[3px] bg-[#00FFB3] w-full rounded-full"></div>
+              <div className="h-[3px] bg-[#00FFB3] w-full rounded-full"></div>
             </div>
           </button>
-          <h2 className="font-display text-xs text-[#00C8FF] text-shadow-primary tracking-wider mt-1">USER PROFILE</h2>
+          <h2 className="font-display text-xs text-[#00FFB3] tracking-widest uppercase flex items-center gap-2 truncate">
+            USER PROFILE
+          </h2>
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0">
+          <SignedIn>
+            <div className="p-0.5 border-2 border-[#00FFB3] rounded-full">
+              <UserButton afterSignOutUrl="/" />
+            </div>
+          </SignedIn>
         </div>
       </header>
 

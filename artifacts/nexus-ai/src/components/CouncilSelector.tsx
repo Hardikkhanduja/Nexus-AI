@@ -1,5 +1,23 @@
 import React, { useState } from "react";
-import { Lock, Sparkles, Check, ArrowRight, Wand2 } from "lucide-react";
+import {
+  Lock,
+  Sparkles,
+  Check,
+  ArrowRight,
+  Wand2,
+  TrendingUp,
+  ShieldAlert,
+  CheckCircle2,
+  Rocket,
+  Briefcase,
+  BarChart3,
+  Scale,
+  SearchCheck,
+  FileText,
+  Cloud,
+  ShieldCheck,
+  Code2
+} from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
@@ -7,7 +25,7 @@ export interface CouncilRole {
   id: string;
   name: string;
   stance: string;
-  icon: string;
+  icon: React.ComponentType<{ className?: string }>;
 }
 
 export interface Council {
@@ -21,11 +39,11 @@ export interface Council {
 const COUNCILS: Council[] = [
   {
     id: "auto",
-    name: "✨ Auto-Detect",
+    name: "Auto-Detect",
     description: "AI classifies query domain & routes to best council.",
     requiresPro: false,
     roles: [
-      { id: "auto_classifier", name: "AI Classifier", stance: "Domain Intelligence", icon: "✨" }
+      { id: "auto_classifier", name: "AI Classifier", stance: "Domain Intelligence", icon: Wand2 }
     ]
   },
   {
@@ -34,9 +52,9 @@ const COUNCILS: Council[] = [
     description: "Balanced 3-way debate: optimistic, skeptical, & empirical.",
     requiresPro: false,
     roles: [
-      { id: "optimist", name: "Optimist", stance: "Visionary", icon: "🟢" },
-      { id: "skeptic", name: "Skeptic", stance: "Risk-Focused", icon: "🔴" },
-      { id: "fact_checker", name: "Fact-Checker", stance: "Empirical", icon: "🔵" }
+      { id: "optimist", name: "Optimist", stance: "Visionary", icon: TrendingUp },
+      { id: "skeptic", name: "Skeptic", stance: "Risk-Focused", icon: ShieldAlert },
+      { id: "fact_checker", name: "Fact-Checker", stance: "Empirical", icon: CheckCircle2 }
     ]
   },
   {
@@ -45,9 +63,9 @@ const COUNCILS: Council[] = [
     description: "Evaluate ideas from Product, VC Investor, and Analyst.",
     requiresPro: true,
     roles: [
-      { id: "product_visionary", name: "Product", stance: "Growth", icon: "🚀" },
-      { id: "vc_investor", name: "VC Investor", stance: "Economics", icon: "💼" },
-      { id: "market_analyst", name: "Analyst", stance: "Competition", icon: "📊" }
+      { id: "product_visionary", name: "Product", stance: "Growth", icon: Rocket },
+      { id: "vc_investor", name: "VC Investor", stance: "Economics", icon: Briefcase },
+      { id: "market_analyst", name: "Analyst", stance: "Competition", icon: BarChart3 }
     ]
   },
   {
@@ -56,9 +74,9 @@ const COUNCILS: Council[] = [
     description: "Examine issues through Defense, Regulatory, & Compliance.",
     requiresPro: true,
     roles: [
-      { id: "defense_counsel", name: "Defense", stance: "Rights", icon: "⚖️" },
-      { id: "compliance_auditor", name: "Compliance", stance: "Regulations", icon: "🔍" },
-      { id: "impartial_arbitrator", name: "Arbitrator", stance: "Precedent", icon: "📜" }
+      { id: "defense_counsel", name: "Defense", stance: "Rights", icon: Scale },
+      { id: "compliance_auditor", name: "Compliance", stance: "Regulations", icon: SearchCheck },
+      { id: "impartial_arbitrator", name: "Arbitrator", stance: "Precedent", icon: FileText }
     ]
   },
   {
@@ -67,9 +85,9 @@ const COUNCILS: Council[] = [
     description: "Technical breakdown: Cloud Architecture, Security, & Dev.",
     requiresPro: true,
     roles: [
-      { id: "cloud_architect", name: "Architect", stance: "Scalability", icon: "☁️" },
-      { id: "security_engineer", name: "Security", stance: "Zero-Trust", icon: "🛡️" },
-      { id: "pragmatic_dev", name: "Lead Dev", stance: "Delivery", icon: "💻" }
+      { id: "cloud_architect", name: "Architect", stance: "Scalability", icon: Cloud },
+      { id: "security_engineer", name: "Security", stance: "Zero-Trust", icon: ShieldCheck },
+      { id: "pragmatic_dev", name: "Lead Dev", stance: "Delivery", icon: Code2 }
     ]
   }
 ];
@@ -138,7 +156,7 @@ export const CouncilSelector: React.FC<CouncilSelectorProps> = ({
             <button
               key={council.id}
               onClick={() => handleCouncilClick(council)}
-              className={`relative text-left p-3 rounded-lg transition-all duration-200 border ${
+              className={`relative text-left p-3 rounded-lg transition-all duration-200 border cursor-pointer ${
                 isSelected
                   ? "bg-indigo-950/40 border-indigo-500 shadow-lg shadow-indigo-500/10 ring-1 ring-indigo-500"
                   : "bg-slate-900/40 border-slate-800 hover:border-slate-700 hover:bg-slate-800/40"
@@ -150,7 +168,7 @@ export const CouncilSelector: React.FC<CouncilSelectorProps> = ({
                 </div>
               )}
 
-              <div className="font-bold text-xs text-slate-100 mb-1 flex items-center gap-1">
+              <div className="font-bold text-xs text-slate-100 mb-1 flex items-center gap-1.5">
                 {council.name}
               </div>
               <p className="text-[11px] text-slate-400 line-clamp-2 mb-2">
@@ -158,14 +176,18 @@ export const CouncilSelector: React.FC<CouncilSelectorProps> = ({
               </p>
 
               <div className="flex flex-wrap gap-1">
-                {council.roles.map((r) => (
-                  <span
-                    key={r.id}
-                    className="text-[9px] bg-slate-800/80 text-slate-300 px-1 py-0.5 rounded border border-slate-700/50 flex items-center gap-1"
-                  >
-                    <span>{r.icon}</span> {r.name}
-                  </span>
-                ))}
+                {council.roles.map((r) => {
+                  const RoleIcon = r.icon;
+                  return (
+                    <span
+                      key={r.id}
+                      className="text-[9px] bg-slate-800/80 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700/50 flex items-center gap-1"
+                    >
+                      <RoleIcon className="w-2.5 h-2.5 text-indigo-400" />
+                      <span>{r.name}</span>
+                    </span>
+                  );
+                })}
               </div>
             </button>
           );
