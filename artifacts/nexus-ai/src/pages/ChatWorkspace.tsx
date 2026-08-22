@@ -69,7 +69,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
 
   // Load conversation history on mount or when conversationId changes
   useEffect(() => {
-    if (conversationId) {
+    if (conversationId && messages.length === 0) {
       setIsLoadingHistory(true);
       const token = localStorage.getItem("nexus_token") || localStorage.getItem("clerk_session");
       fetch(`/api/ai/conversations/${conversationId}`, {
@@ -82,8 +82,10 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
           return res.json();
         })
         .then((data) => {
-          setMessages(data.messages || []);
-          setConversationTitle(data.title || "DISCUSSION");
+          if (data.messages && data.messages.length > 0) {
+            setMessages(data.messages);
+          }
+          if (data.title) setConversationTitle(data.title);
         })
         .catch((err) => {
           console.error("Failed to load conversation:", err);
@@ -91,11 +93,27 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
         .finally(() => {
           setIsLoadingHistory(false);
         });
-    } else {
-      setMessages([]);
-      setConversationTitle("NEW DISCUSSION");
     }
   }, [conversationId]);
+
+  // Auto-send prompt if launched from LandingPage
+  useEffect(() => {
+    const initialPrompt = sessionStorage.getItem("nexus_initial_prompt");
+    if (initialPrompt && !conversationId) {
+      sessionStorage.removeItem("nexus_initial_prompt");
+      const userPrompt = initialPrompt.trim();
+      setMessages([
+        {
+          id: Math.random().toString(),
+          role: "user",
+          content: userPrompt,
+        },
+      ]);
+      setTimeout(() => {
+        sendMessage(userPrompt, undefined, provider, selectedCouncilId);
+      }, 400);
+    }
+  }, [conversationId, provider, selectedCouncilId]);
 
   // Connect to websocket hook
   const {
@@ -120,7 +138,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
       ]);
 
       if (!conversationId && returnedConvId) {
-        setLocation(`/chat/${returnedConvId}`);
+        window.history.replaceState(null, "", `/chat/${returnedConvId}`);
       }
     },
     onError: (msg) => {
@@ -265,15 +283,6 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
 
       {/* MESSAGES / CHAT CONTAINER */}
       <main className="flex-1 flex flex-col relative overflow-y-auto custom-scrollbar p-6 bg-[#08080B]">
-        {/* COUNCIL SELECTOR AT TOP */}
-        <div className="max-w-3xl w-full mx-auto">
-          <CouncilSelector
-            selectedCouncilId={selectedCouncilId}
-            onSelectCouncil={(cId) => setSelectedCouncilId(cId)}
-            userTier={userTier}
-            onToggleTier={handleToggleTier}
-          />
-        </div>
 
         {isLoadingHistory ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-4">
@@ -352,7 +361,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
               <div className="flex flex-col max-w-[90%] rounded-2xl border-2 border-[#FF4FD8] bg-[#FF4FD8]/5 text-[#FFEAF9] shadow-[3px_3px_0px_rgba(255,79,216,0.2)] p-4 self-start w-full">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-display text-[9px] text-[#FF4FD8] uppercase tracking-wider flex items-center gap-1.5">
-                    <Sparkles size={10} className="animate-pulse" /> Parallel Council Debate in Progress...
+                    <Sparkles size={10} className="animate-pulse" /> Parallel Council Conversation in Progress...
                   </span>
                 </div>
 

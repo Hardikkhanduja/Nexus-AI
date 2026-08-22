@@ -26,6 +26,7 @@ export default function LandingPage({ onOpenSidebar }: LandingPageProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
+      sessionStorage.setItem("nexus_initial_prompt", query.trim());
       setLocation("/chat");
     }
   };

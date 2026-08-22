@@ -18,7 +18,6 @@ const mainItems = [
   { icon: MessageSquare, label: "Chat History", path: "/history" },
   { icon: BarChart2, label: "Analytics", path: "/analytics" },
   { icon: Activity, label: "Agent Performance", path: "/performance" },
-  { icon: Bookmark, label: "Saved Conversations", path: "/saved" },
 ];
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {

@@ -58,7 +58,7 @@ function AppRouter() {
             <PerformancePage onOpenSidebar={openSidebar} />
           </Route>
           <Route path="/saved">
-            <SavedPage onOpenSidebar={openSidebar} />
+            <HistoryPage onOpenSidebar={openSidebar} />
           </Route>
 
           {/* Login Routes & Callbacks */}

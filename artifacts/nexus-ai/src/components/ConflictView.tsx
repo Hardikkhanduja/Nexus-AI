@@ -37,16 +37,16 @@ export const ConflictView: React.FC<ConflictViewProps> = ({ conflictAnalysis }) 
 
   return (
     <div className="w-full mt-4 bg-slate-950/95 border border-slate-800 rounded-xl overflow-hidden shadow-2xl">
-      {/* Header Bar */}
+      {/* TOGGLE BAR */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-4 py-3 bg-slate-900/80 hover:bg-slate-900 border-b border-slate-800 flex items-center justify-between transition-colors cursor-pointer"
+        className="w-full bg-[#14141A] border border-indigo-500/40 hover:border-indigo-400 p-3 rounded-xl flex items-center justify-between transition-all cursor-pointer shadow-md group"
       >
-        <div className="flex items-center gap-2.5">
-          <Scale className="w-5 h-5 text-indigo-400" />
-          <h4 className="text-sm font-bold text-slate-100 tracking-wide">
-            Council Debate & Conflict Analysis
-          </h4>
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-indigo-400 group-hover:rotate-12 transition-transform" />
+          <span className="font-bold text-xs text-slate-200 uppercase tracking-wider">
+            Council Perspectives & Conflict Analysis
+          </span>
           <span className="text-[11px] bg-indigo-950 text-indigo-300 border border-indigo-800/50 px-2 py-0.5 rounded-full font-medium">
             3 LLMs Evaluated
           </span>
