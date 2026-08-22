@@ -1,5 +1,5 @@
 zerops:
-  # 1. Managed PostgreSQL Database
+  # 1. Managed PostgreSQL Database (v1.0.2)
   - setup: db
     type: postgresql@16
 
