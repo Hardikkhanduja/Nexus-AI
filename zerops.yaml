@@ -1,4 +1,4 @@
-# Zerops Deployment Configuration for Nexus AI
+# Zerops Deployment Configuration for Nexus AI (v1.0.1)
 
 services:
   # 1. Managed PostgreSQL Database
