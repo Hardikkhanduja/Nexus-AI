@@ -35,11 +35,15 @@ export default function UsagePage({ onOpenSidebar }: UsagePageProps) {
   useEffect(() => {
     const updateCountdown = () => {
       const now = new Date();
-      const nextMidnight = new Date();
-      nextMidnight.setUTCDate(nextMidnight.getUTCDate() + 1);
-      nextMidnight.setUTCHours(0, 0, 0, 0);
+      // Convert now to IST (UTC+5:30)
+      const utcTimestamp = now.getTime() + (now.getTimezoneOffset() * 60000);
+      const istNow = new Date(utcTimestamp + (5.5 * 3600000));
 
-      const diffMs = nextMidnight.getTime() - now.getTime();
+      const nextMidnightIST = new Date(istNow);
+      nextMidnightIST.setDate(nextMidnightIST.getDate() + 1);
+      nextMidnightIST.setHours(0, 0, 0, 0);
+
+      const diffMs = nextMidnightIST.getTime() - istNow.getTime();
       if (diffMs <= 0) {
         setCountdown("00:00:00");
         return;
@@ -255,10 +259,10 @@ export default function UsagePage({ onOpenSidebar }: UsagePageProps) {
             <div className="bg-[#0D0D12] border-2 border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between h-48 group hover:border-[#00C8FF] transition-all">
               <div>
                 <h3 className="font-mono text-xs text-[#00C8FF] uppercase tracking-wider mb-1 flex items-center gap-2 font-bold">
-                  <Clock className="w-4 h-4 text-[#00C8FF]" /> LIMIT RESET TIMER
+                  <Clock className="w-4 h-4 text-[#00C8FF]" /> LIMIT RESET TIMER (IST)
                 </h3>
                 <p className="text-xs text-slate-400 font-sans leading-relaxed">
-                  Daily query quotas automatically refresh at 00:00 UTC.
+                  Daily query quotas automatically refresh at 00:00 IST (Indian Standard Time).
                 </p>
               </div>
               <div className="space-y-1 pt-2">
@@ -270,7 +274,7 @@ export default function UsagePage({ onOpenSidebar }: UsagePageProps) {
                   <span className={`w-3 h-3 rounded-full bg-[#00C8FF] ${tick ? "opacity-100 scale-125 shadow-[0_0_10px_#00C8FF]" : "opacity-30 scale-100"} transition-all duration-300`} />
                 </div>
                 <div className="text-xs font-mono text-slate-500 uppercase">
-                  UTC Cycle Refresh Countdown
+                  IST Cycle Refresh Countdown
                 </div>
               </div>
             </div>

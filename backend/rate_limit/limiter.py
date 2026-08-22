@@ -4,13 +4,19 @@ Single Source of Truth for Nexus AI Quota Enforcement.
 """
 
 import logging
-from datetime import timezone, datetime
+from datetime import timezone, datetime, timedelta
 from typing import Tuple, Optional, Dict
 import psycopg2.extensions
 
 from backend.config import GUEST_DAILY_LIMIT, REGISTERED_FREE_DAILY_LIMIT, PRO_DAILY_LIMIT
 
 logger = logging.getLogger(__name__)
+
+# Indian Standard Time (IST) Timezone Definition (UTC+5:30)
+IST = timezone(timedelta(hours=5, minutes=30))
+
+def get_today_ist_str() -> str:
+    return datetime.now(IST).strftime("%Y-%m-%d")
 
 # Server-side Guest IP rate tracking memory cache
 # Key: (ip_address, date_str), Value: count
@@ -25,8 +31,8 @@ def is_valid_uuid(val: str) -> bool:
         return False
 
 def check_guest_ip_limit(client_ip: str) -> Tuple[bool, int, int]:
-    """Server-side IP rate tracking for guest users."""
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    """Server-side IP rate tracking for guest users (IST timezone reset)."""
+    today_str = get_today_ist_str()
     cache_key = (client_ip or "127.0.0.1", today_str)
 
     # Clean up stale cache keys from previous days
@@ -49,8 +55,8 @@ async def check_and_increment(
     client_ip: str = "127.0.0.1"
 ) -> Tuple[bool, int, int]:
     """
-    Checks rate limit based on user tier.
-    Guest = 5 queries/day (enforced server-side by IP).
+    Checks rate limit based on user tier in Indian Standard Time (IST).
+    Guest = 5 queries/day.
     Free Registered = 30 queries/day.
     Pro Tier = Unlimited.
     """
@@ -63,7 +69,7 @@ async def check_and_increment(
         return True, daily_limit, daily_limit
 
     try:
-        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today_str = get_today_ist_str()
 
         with conn.cursor() as cur:
             # 1. Ensure user_limits row exists
