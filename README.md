@@ -1,55 +1,209 @@
-# NexusAI
+<div align="center">
 
-Nexus-style AI chat frontend + lightweight Python backend for streaming AI responses, conversation persistence, and rate limiting. This repo contains a Vite + React frontend (in `artifacts/nexus-ai`) and a FastAPI backend (in `backend`) that connects to a PostgreSQL database — Supabase is the recommended hosting option.
+  # ⚡ NEXUS AI ⚡
+  ### Multi-Agent Consensus & Adversarial Reasoning Platform
 
-**What it does**
-- Frontend: React app with chat UI, WebSocket client for streaming replies, conversation UI and user flows.
-- Backend: FastAPI WebSocket endpoint that streams agent responses (OpenAI / Anthropic / Gemini / Groq providers), persists conversations/messages, and enforces per-user rate limits via `user_limits` table.
+  [![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+  [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
+  [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://typescriptlang.org)
+  [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+  [![Vite](https://img.shields.io/badge/Vite-7.0-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev)
+  [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://postgresql.org)
+  [![Render](https://img.shields.io/badge/Deploy-Render-46E3B7?style=for-the-badge&logo=render&logoColor=black)](https://render.com)
+  [![Zerops](https://img.shields.io/badge/Deploy-Zerops-00C8FF?style=for-the-badge&logo=zerops&logoColor=black)](https://zerops.io)
 
-**Repository layout (important parts)**
-- `artifacts/nexus-ai/` — React + Vite frontend
-- `backend/` — FastAPI backend, DB helper, providers, rate limiter
-- `lib/db/src/schema/` — Drizzle schema definitions (users, conversations, messages, user_limits)
+  <p align="center">
+    <strong>An advanced multi-LLM orchestration platform featuring parallel agent debates, conflict detection, consensus synthesis, and real-time streaming telemetry.</strong>
+  </p>
+
+  [Live Demo](https://nexus-ai-frontend.onrender.com) • [Report Issue](https://github.com/Hardikkhanduja/Nexus-AI/issues) • [API Documentation](#-api-reference)
+
+</div>
 
 ---
 
-## Prerequisites
-- Node.js (18+), `pnpm` preferred (or `npm`) for frontend
-- Python 3.11+ and `pip` for backend
-- Supabase project (Postgres DB) or any PostgreSQL server
-- Docker (optional, for local Postgres)
+## 🌟 Overview
 
----
+**Nexus AI** is a state-of-the-art Multi-Agent Intelligence Engine designed to eliminate AI hallucination, single-model bias, and tunnel vision. Instead of relying on a single language model, Nexus AI deploys specialized councils of AI personas (e.g. *Optimist*, *Skeptic*, *Domain Specialist*, and *Synthesizer*) that debate complex queries concurrently, analyze points of agreement vs. disagreement, and synthesize a single, highly refined consensus verdict.
 
-## Environment
-Copy `.env.example` to `.env` and fill values.
-Key variables used by the backend (put in `.env`):
-
+```mermaid
+graph TD
+    A["👤 User Input Query"] --> B["⚡ FastAPI Multi-Agent Orchestrator"]
+    B --> C1["🧠 Groq LPU (Llama 3.3 70B)"]
+    B --> C2["✨ Google Gemini 2.0 Flash"]
+    B --> C3["🎯 Perplexity Sonar (Web Grounding)"]
+    B --> C4["⚡ NVIDIA NIM / OpenAI / Claude"]
+    
+    C1 --> D["⚔️ Adversarial Stance Extraction"]
+    C2 --> D
+    C3 --> D
+    C4 --> D
+    
+    D --> E["📊 Conflict & Consensus Analyzer"]
+    E --> F["🏆 Final Synthesized Verdict Stream"]
+    F --> G["💬 React Cyberpunk UI (WebSockets)"]
 ```
-DATABASE_URL=postgresql://<user>:<password>@<host>:5432/postgres?sslmode=require
-JWT_SECRET=... (dev default is in repo)
-JWT_REFRESH_SECRET=...
-FRONTEND_URL=http://localhost:5173
-PORT=3000
-OPENAI_API_KEY=...
-ANTHROPIC_API_KEY=...
-GROQ_API_KEY=...  # use your own Groq API key here
-GEMINI_API_URL=
-GEMINI_API_KEY=
-GEMINI_MODEL=gemini-default
-```
-
-Notes:
-- For Supabase, use the DB connection string from Project Settings → Database → Connection string. Ensure `?sslmode=require` is present (Supabase requires TLS).
-- Do NOT commit `.env` to source control. `.gitignore` includes `.env` by default.
 
 ---
 
-## Supabase setup (tables required)
-Open the SQL editor in Supabase and run the following SQL (creates the schema the backend expects):
+## ✨ Key Features
+
+### 🧠 Adversarial Multi-Agent Debates
+- **Parallel Multi-Model Execution**: Queries are evaluated concurrently across **Groq LPU**, **Google Gemini 2.0 Flash**, **Perplexity Sonar**, **NVIDIA NIM**, **OpenAI GPT-4o**, and **Anthropic Claude 3.5 Sonnet**.
+- **Role-Based Personas**: Dynamically assigns roles (Optimist, Skeptic, Security Auditor, Systems Architect) based on query domain classification (Coding, Architecture, Finance, Science, Writing).
+- **Conflict Analysis & Verdict Synthesis**: Automatically extracts key points of agreement, points of disagreement, and produces a balanced summary.
+
+### ⚡ Real-Time WebSockets Engine
+- **Sub-Second Token Streaming**: Real-time WebSocket connection (`/ws/chat`) streams individual agent responses and synthesis chunks directly to the UI.
+- **Fail-Safe Fallbacks**: Built-in automatic provider routing. If a primary API endpoint experiences rate-limits or downtime, requests seamlessly failover to alternative high-speed models without interrupting the session.
+
+### 🛡️ Enterprise Security & Safe Auth
+- **Clerk SSO & Local JWT Support**: Dual support for Clerk authentication and local JWT tokens.
+- **Safe Fallback Wrappers**: Custom `SafeSignedIn`, `SafeSignedOut`, and `SafeUserButton` components prevent runtime exceptions when third-party auth keys are missing or uninitialized.
+- **Strict Rate Limiting**: Tier-based daily query quotas (Guest, Registered Free, Pro) enforced via PostgreSQL connection pooling.
+
+### 📊 Agent Telemetry & Analytics
+- **Live Performance Dashboard**: Real-time monitoring of model latencies, token throughput, session usage shares, and fallback event frequencies.
+- **Interactive Analytics**: Visual distribution of queries by domain category using Recharts.
+
+### 🎨 Neo-Brutalist Cyberpunk Design System
+- Built with **TailwindCSS v4**, **Framer Motion**, and **Lucide Icons**.
+- Smooth dark mode glassmorphism, responsive drawer sidebars, custom code block syntax highlighting, and interactive micro-animations.
+
+---
+
+## 🛠️ Technology Stack
+
+| Domain | Technology | Purpose |
+| :--- | :--- | :--- |
+| **Frontend Framework** | React 19 + TypeScript | UI Architecture & Type Safety |
+| **Build Tool** | Vite 7 | Lightning-Fast Bundling & HMR |
+| **Styling & Motion** | TailwindCSS v4 + Framer Motion | Cyberpunk Theme & Micro-animations |
+| **Authentication** | Clerk Auth + Custom JWT | Authentication & Access Control |
+| **Backend Framework** | Python 3.11 + FastAPI | Async REST API & WebSockets Server |
+| **ASGI Web Server** | Uvicorn | High-Performance Asynchronous Server |
+| **Database** | PostgreSQL / Supabase | Session, Chat History, & Quota Storage |
+| **ORM / Migrations** | Drizzle ORM / Psycopg2 | Database Schema Management & Pooling |
+| **AI LLM Engine** | Groq, Gemini, Perplexity, NVIDIA | Multi-Model Parallel Inference |
+| **Deployment** | Render / Zerops / Vercel | Production Infrastructure & CI/CD |
+
+---
+
+## 📂 Repository Structure
+
+```text
+Nexus-AI/
+├── artifacts/
+│   └── nexus-ai/             # React 19 + Vite Frontend
+│       ├── src/
+│       │   ├── components/    # Reusable UI Components & Safe Clerk Wrappers
+│       │   ├── contexts/      # AuthContext & Dynamic API Base Resolvers
+│       │   ├── hooks/         # useWebSocket, useUsage, useProfile
+│       │   ├── lib/           # Centralized API, WebSocket & Clerk Helpers
+│       │   └── pages/         # Landing, Workspace, Performance, Analytics, History
+│       ├── package.json
+│       └── vite.config.ts
+├── backend/                   # FastAPI Python Backend
+│   ├── main.py                # App Initialization, CORS Middleware & Routes
+│   ├── db.py                  # PostgreSQL Pool & Schema Auto-Migrations
+│   ├── config.py              # System Limits & Model Configs
+│   ├── agents/                # Orchestrator, Routing, & Council Implementations
+│   ├── rate_limit/            # Per-User Rate Limiting Engine
+│   ├── security/              # Clerk & JWT Verification Helpers
+│   ├── websocket/             # Real-Time Chat WebSocket Handler
+│   └── requirements.txt       # Python Dependencies
+├── render.yaml                # Render Blueprint (1-Click Full-Stack Deployment)
+├── zerops.yaml                # Zerops Multi-Service Infrastructure Blueprint
+├── pnpm-workspace.yaml        # Workspace Configuration
+└── README.md                  # Project Documentation
+```
+
+---
+
+## 🚀 Quick Start (Local Development)
+
+### 1. Prerequisites
+- **Node.js** 20.x or higher
+- **pnpm** (recommended) or `npm`
+- **Python** 3.11 or higher
+- **PostgreSQL** instance (Supabase or local Postgres)
+
+---
+
+### 2. Environment Configuration
+Create a `.env` file in the root directory:
+
+```env
+# Database & Auth Configuration
+DATABASE_URL=postgresql://postgres:password@localhost:5432/postgres
+JWT_SECRET=nexus_ai_secure_jwt_key_2026
+
+# AI LLM Provider API Keys
+GROQ_API_KEY=gsk_your_groq_key_here
+GEMINI_API_KEY=your_gemini_key_here
+PERPLEXITY_API_KEY=pplx-your_perplexity_key_here
+NVIDIA_API_KEY=nvapi-your_nvidia_key_here
+OPENAI_API_KEY=sk-your_openai_key_here
+ANTHROPIC_API_KEY=sk-ant-your_anthropic_key_here
+
+# Optional Clerk Authentication
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+
+# Frontend API Targets (Dev Mode)
+VITE_API_URL=http://localhost:8000
+VITE_WS_URL=ws://localhost:8000/ws/chat
+```
+
+---
+
+### 3. Backend Setup (FastAPI)
+
+```bash
+# Navigate to repository root
+cd Nexus-AI
+
+# Create & activate a Python virtual environment
+python -m venv venv
+# On Windows:
+.\venv\Scripts\activate
+# On Linux/macOS:
+source venv/bin/activate
+
+# Install backend dependencies
+pip install -r backend/requirements.txt
+
+# Launch FastAPI backend on port 8000
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+---
+
+### 4. Frontend Setup (React + Vite)
+
+Open a second terminal window:
+
+```bash
+# Install workspace dependencies
+pnpm install
+
+# Start Vite development server
+pnpm --filter @workspace/nexus-ai dev
+```
+
+Open `http://localhost:5173` in your browser to access **Nexus AI**!
+
+---
+
+## 🗄️ Database Setup (SQL Schema)
+
+Execute the following SQL in your PostgreSQL / Supabase SQL Editor:
 
 ```sql
--- users
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- Users Table
 CREATE TABLE IF NOT EXISTS users (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email varchar(255) NOT NULL UNIQUE,
@@ -58,130 +212,97 @@ CREATE TABLE IF NOT EXISTS users (
   provider varchar(50) NOT NULL DEFAULT 'email',
   password_hash text,
   email_verified boolean NOT NULL DEFAULT false,
-  email_verification_token text,
   total_lifetime_queries integer NOT NULL DEFAULT 0,
+  tier varchar(20) NOT NULL DEFAULT 'free',
+  clerk_id varchar(100) UNIQUE,
   created_at timestamp NOT NULL DEFAULT now()
 );
 
--- conversations
+-- Conversations Table
 CREATE TABLE IF NOT EXISTS conversations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  title varchar(500) NOT NULL DEFAULT 'New Conversation',
+  user_id uuid REFERENCES users(id) ON DELETE CASCADE,
+  clerk_id varchar(100),
+  title varchar(500) NOT NULL DEFAULT 'New Discussion',
   created_at timestamp NOT NULL DEFAULT now(),
   updated_at timestamp NOT NULL DEFAULT now()
 );
 
--- messages
+-- Messages Table with Analytics Columns
 CREATE TABLE IF NOT EXISTS messages (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   conversation_id uuid NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
   role varchar(50) NOT NULL,
   content text NOT NULL,
-  agent_name varchar(100) NOT NULL DEFAULT 'GPT',
+  agent_name varchar(100) NOT NULL DEFAULT 'Nexus AI',
+  category varchar(100),
+  persona_role varchar(50),
+  provider varchar(50),
+  latency_ms integer,
+  was_fallback boolean DEFAULT false,
+  conflict_analysis text,
   created_at timestamp NOT NULL DEFAULT now()
 );
 
--- user_limits
+-- Daily Rate Limits Table
 CREATE TABLE IF NOT EXISTS user_limits (
   id serial PRIMARY KEY,
-  user_id uuid NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  clerk_id varchar(100) UNIQUE,
   queries_used_today integer NOT NULL DEFAULT 0,
   last_reset_date date NOT NULL DEFAULT now()
 );
 ```
 
-If your Supabase project lacks the `pgcrypto` or `pgjwt` extensions used by some setups, follow Supabase docs to enable required extensions. The schema above uses `gen_random_uuid()` which requires `pgcrypto` — if unavailable, use `uuid_generate_v4()` or set UUIDs from the app.
+---
+
+## 🌐 Production Deployment
+
+### Option 1: 1-Click Deployment on Render.com (Recommended)
+
+Nexus AI includes a pre-configured [`render.yaml`](file:///d:/Nexus-AI/render.yaml) blueprint:
+
+1. Sign in to [Render.com](https://render.com) using your GitHub account.
+2. Click **New +** ➡️ **Blueprint**.
+3. Connect repository `Hardikkhanduja/Nexus-AI`.
+4. Enter your API keys under environment variables for `nexus-ai-backend`.
+5. Click **Apply**. Render will automatically build both Python Backend & React Frontend!
+
+### Option 2: Deployment on Zerops.io
+
+Nexus AI includes a pre-configured [`zerops.yaml`](file:///d:/Nexus-AI/zerops.yaml) blueprint:
+
+1. Import repository into Zerops.
+2. Link PostgreSQL service `db`, Python service `api`, and Static service `app`.
+3. Set `DATABASE_URL` as `${db_connectionString}`.
 
 ---
 
-## Backend: install & run
-From repository root:
+## 📡 API Reference
 
-```bash
-# create venv and install
-python -m venv .venv
-# Windows PowerShell
-.\.venv\Scripts\Activate.ps1
-# or PowerShell (cmd): .\.venv\Scripts\activate
-python -m pip install -r backend/requirements.txt
+### REST Endpoints
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :---: |
+| `GET` | `/health` | Core System Health Check | ❌ |
+| `GET` | `/api/ai/councils` | Available Domain Councils & Tiers | ❌ |
+| `GET` | `/api/ai/analytics` | Real-time System Telemetry & Aggregates | 🛡️ Optional |
+| `GET` | `/api/ai/performance` | Live Model Benchmarks & Latencies | 🛡️ Optional |
+| `GET` | `/api/user/usage` | Current User Daily Quota & Lifetime Queries | 🛡️ Optional |
+| `POST` | `/api/user/toggle-tier` | Switch Between Free & Pro Demo Tier | 🛡️ Optional |
+| `GET` | `/api/ai/conversations` | Fetch Saved User Conversations | 🛡️ Optional |
 
-# start backend (development)
-cd backend
-uvicorn backend.main:app --reload --host 0.0.0.0 --port 3000
-```
-
-Health endpoints:
-- General: `GET /health` → {"status":"ok"}
-- DB check: `GET /api/health/db` → {"status":"ok","database":"connected"} if DB reachable
+### WebSocket Endpoint
+| Endpoint | Protocol | Description |
+| :--- | :--- | :--- |
+| `/ws/chat` | `ws://` / `wss://` | Real-time multi-agent debate stream & synthesizer output |
 
 ---
 
-## Frontend: install & run
-```
-cd artifacts/nexus-ai
-pnpm install
-# or: npm install
-# set env for Vite (example, on PowerShell)
-$Env:PORT=5173; $Env:BASE_PATH='/' ; pnpm dev
-```
-If port 5173 is in use, change `PORT` or stop the other process.
+## 🛡️ License
+
+This project is open-source under the [MIT License](file:///d:/Nexus-AI/LICENSE).
 
 ---
 
-## Common issues & debugging
-
-- "Database error checking limits." (WebSocket shows this)
-  - Cause: backend cannot connect to Postgres or an SQL operation failed during rate-limit check.
-  - Steps:
-    1. Ensure `.env` `DATABASE_URL` is correct and contains `?sslmode=require` for Supabase.
-    2. From `backend/` run:
-    ```powershell
-    python -c "from dotenv import load_dotenv; import os; import psycopg2; load_dotenv(); print(os.environ.get('DATABASE_URL')); conn=psycopg2.connect(os.environ['DATABASE_URL']); print('connected'); conn.close()"
-    ```
-    3. Check Supabase SQL editor for the required tables (`users`, `conversations`, `messages`, `user_limits`).
-    4. Inspect backend logs — startup now fails fast if DB init fails; check `backend/main.py` logs.
-
-- WebSocket connection fails or streaming stalls
-  - Ensure backend is running and WebSocket endpoint is reachable: `ws://localhost:3000/ws/chat` (or `wss` in production)
-  - Inspect browser console for network errors, and backend logs for stack traces when streaming errors occur.
-
-- Port conflict when starting frontend
-  - If Vite reports port busy, change `PORT` env var before `pnpm dev` or kill the process holding that port.
-
-- Provider API errors (OpenAI / Anthropic / Gemini / Groq)
-  - Confirm API keys are set in `.env`. Check provider-specific logs in `backend/` — provider modules will log errors.
-
-- `psycopg2` or dependency issues
-  - If pip install fails on Windows, try `pip install psycopg2-binary` (already in `requirements.txt`) or use the prebuilt wheel.
-
----
-
-## Useful commands summary
-
-```powershell
-# Backend
-cd backend
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-uvicorn backend.main:app --reload --port 3000
-
-# Frontend
-cd artifacts/nexus-ai
-pnpm install
-$Env:PORT=5173; $Env:BASE_PATH='/'; pnpm dev
-
-# Quick DB check
-python -c "from dotenv import load_dotenv; import os, psycopg2; load_dotenv(); conn=psycopg2.connect(os.environ['DATABASE_URL']); cur=conn.cursor(); cur.execute('select 1'); print(cur.fetchone()); conn.close()"
-```
-
----
-
-## Next steps I can help with
-- Run the DB connectivity test from the workspace now and list tables.
-- Add Supabase Auth integration so JWT from Supabase can be used instead of the current `JWT_SECRET`.
-- Create a GitHub Action to run backend tests and linting on push.
-
----
-
-File reference: see `backend/main.py` for DB health endpoint and `lib/db/src/schema` for schema definitions.
+<div align="center">
+  <sub>Built with ❤️ by Hardik & The Nexus AI Engineering Team.</sub>
+</div>
