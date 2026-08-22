@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { getApiUrl } from "@/lib/api";
 import { motion } from "framer-motion";
 import { useLocation, Link } from "wouter";
 import { SafeSignedIn as SignedIn, SafeUserButton as UserButton } from "@/lib/clerk";
@@ -108,7 +109,7 @@ export default function AnalyticsPage({ onOpenSidebar }: AnalyticsPageProps) {
 
     const token = localStorage.getItem("nexus_token") || localStorage.getItem("clerk_session");
 
-    fetch("/api/ai/analytics", {
+    fetch(getApiUrl("/api/ai/analytics"), {
       headers: {
         Authorization: token ? `Bearer ${token}` : "",
       },

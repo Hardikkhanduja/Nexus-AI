@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { getApiUrl } from "@/lib/api";
 import { motion } from "framer-motion";
 import { useLocation, Link } from "wouter";
 import { SafeSignedIn as SignedIn, SafeUserButton as UserButton } from "@/lib/clerk";
@@ -68,7 +69,7 @@ export default function PerformancePage({ onOpenSidebar }: PerformancePageProps)
 
     const token = localStorage.getItem("nexus_token") || localStorage.getItem("clerk_session");
 
-    fetch("/api/ai/performance", {
+    fetch(getApiUrl("/api/ai/performance"), {
       headers: {
         Authorization: token ? `Bearer ${token}` : "",
       },

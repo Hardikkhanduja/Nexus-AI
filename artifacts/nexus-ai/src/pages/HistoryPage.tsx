@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { getApiUrl } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation, Link } from "wouter";
 import { SafeSignedIn as SignedIn, SafeSignedOut as SignedOut, SafeUserButton as UserButton } from "@/lib/clerk";
@@ -45,7 +46,7 @@ export default function HistoryPage({ onOpenSidebar }: HistoryPageProps) {
     setIsLoading(true);
     const token = localStorage.getItem("nexus_token") || localStorage.getItem("clerk_session");
     
-    fetch("/api/ai/conversations", {
+    fetch(getApiUrl("/api/ai/conversations"), {
       headers: {
         Authorization: token ? `Bearer ${token}` : "",
       },

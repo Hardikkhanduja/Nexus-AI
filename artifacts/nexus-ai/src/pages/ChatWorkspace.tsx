@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { getApiUrl } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, Copy, Sparkles, Check, Zap, Landmark, Share2, X, ExternalLink, FileText } from "lucide-react";
 import { useUsage } from "@/hooks/useUsage";
@@ -56,7 +57,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
 
   // Fetch initial tier status
   useEffect(() => {
-    fetch("/api/ai/councils")
+    fetch(getApiUrl("/api/ai/councils"))
       .then((res) => res.json())
       .then((data) => {
         if (data?.user_tier) {
@@ -73,7 +74,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
       title: `Tier Switched to ${nextTier.toUpperCase()}`,
       description: nextTier === "pro" ? "All Domain Councils Unlocked & Unlimited Queries!" : "Free Tier Active (30 Queries/Day)",
     });
-    fetch("/api/user/toggle-tier", { method: "POST" }).catch(() => {});
+    fetch(getApiUrl("/api/user/toggle-tier"), { method: "POST" }).catch(() => {});
   };
 
   // Load conversation history or reset workspace on conversationId changes
@@ -87,7 +88,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
 
     setIsLoadingHistory(true);
     const token = localStorage.getItem("nexus_token") || localStorage.getItem("clerk_session");
-    fetch(`/api/ai/conversations/${conversationId}`, {
+    fetch(getApiUrl(`/api/ai/conversations/${conversationId}`), {
       headers: {
         Authorization: token ? `Bearer ${token}` : "",
       },
@@ -169,7 +170,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
       if (returnedConvId) {
         setCreatedConvId(returnedConvId);
         window.history.replaceState(null, "", `/chat/${returnedConvId}`);
-        fetch(`/api/ai/conversations/${returnedConvId}/generate-title`, { method: "POST" })
+        fetch(getApiUrl(`/api/ai/conversations/${returnedConvId}/generate-title`), { method: "POST" })
           .then((res) => res.json())
           .then((data) => {
             if (data.title) setConversationTitle(data.title);

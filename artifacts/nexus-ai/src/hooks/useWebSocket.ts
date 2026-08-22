@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { getWsUrl } from "@/lib/api";
 
 export interface AgentStance {
   role_id: string;
@@ -54,9 +55,7 @@ export function useWebSocket(options?: UseWebSocketOptions) {
       optionsRef.current.onStatusChange("Connecting...");
     }
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = import.meta.env.VITE_WS_HOST || window.location.host;
-    const wsUrl = `${protocol}//${host}/ws/chat`;
+    const wsUrl = getWsUrl();
 
     const token = localStorage.getItem("nexus_token") || localStorage.getItem("clerk_session");
     const url = token ? `${wsUrl}?token=${encodeURIComponent(token)}` : wsUrl;

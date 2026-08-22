@@ -34,7 +34,9 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 // ─── API Base ──────────────────────────────────────────────────
 
-const API_BASE = import.meta.env.VITE_API_URL || "/api";
+import { getApiBaseUrl, getApiUrl } from "@/lib/api";
+
+const API_BASE = getApiBaseUrl() ? `${getApiBaseUrl()}/api` : "/api";
 
 function getToken(): string | null {
   const localToken = localStorage.getItem("nexus_token") || localStorage.getItem("clerk_session");
