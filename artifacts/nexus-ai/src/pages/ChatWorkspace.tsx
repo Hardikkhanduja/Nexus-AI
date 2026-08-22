@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Send, Copy, AlertTriangle, Sparkles, Check } from "lucide-react";
+import { motion } from "framer-motion";
+import { Send, Copy, Sparkles, Check } from "lucide-react";
 import { useUsage } from "@/hooks/useUsage";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -11,6 +11,9 @@ import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { atomDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 
+import { CouncilSelector } from "@/components/CouncilSelector";
+import { ConflictView, ConflictAnalysis } from "@/components/ConflictView";
+
 interface ChatWorkspaceProps {
   onOpenSidebar: () => void;
 }
@@ -20,6 +23,7 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   agentName?: string;
+  conflictAnalysis?: ConflictAnalysis;
   createdAt?: string;
 }
 
@@ -28,25 +32,49 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
   const { conversationId } = useParams<{ conversationId?: string }>();
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
-  const { remaining: localRemaining, usage } = useUsage();
+  const { remaining: localRemaining } = useUsage();
 
   const [prompt, setPrompt] = useState("");
-  const [provider, setProvider] = useState<"openai" | "anthropic">("openai");
+  const [provider, setProvider] = useState<string>("gemini");
+  const [selectedCouncilId, setSelectedCouncilId] = useState<string>("auto");
+  const [userTier, setUserTier] = useState<"free" | "pro">("free");
   const [messages, setMessages] = useState<Message[]>([]);
-  const [conversationTitle, setConversationTitle] = useState("NEW CONVERSATION");
+  const [conversationTitle, setConversationTitle] = useState("NEW DISCUSSION");
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Fetch initial tier status
+  useEffect(() => {
+    fetch("/api/ai/councils")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.user_tier) {
+          setUserTier(data.user_tier);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleToggleTier = () => {
+    const nextTier = userTier === "free" ? "pro" : "free";
+    setUserTier(nextTier);
+    toast({
+      title: `Tier Switched to ${nextTier.toUpperCase()}`,
+      description: nextTier === "pro" ? "All Domain Councils Unlocked & Unlimited Queries!" : "Free Tier Active (10 Queries/Day)",
+    });
+    fetch("/api/user/toggle-tier", { method: "POST" }).catch(() => {});
+  };
+
   // Load conversation history on mount or when conversationId changes
   useEffect(() => {
-    if (conversationId && isAuthenticated) {
+    if (conversationId) {
       setIsLoadingHistory(true);
-      const token = localStorage.getItem("nexus_token");
+      const token = localStorage.getItem("nexus_token") || localStorage.getItem("clerk_session");
       fetch(`/api/ai/conversations/${conversationId}`, {
         headers: {
-          "Authorization": token ? `Bearer ${token}` : "",
+          Authorization: token ? `Bearer ${token}` : "",
         },
       })
         .then((res) => {
@@ -55,56 +83,49 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
         })
         .then((data) => {
           setMessages(data.messages || []);
-          setConversationTitle(data.title || "CONVERSATION");
+          setConversationTitle(data.title || "DISCUSSION");
         })
         .catch((err) => {
           console.error("Failed to load conversation:", err);
-          toast({
-            title: "Error",
-            description: "Could not load conversation history.",
-            variant: "destructive",
-          });
         })
         .finally(() => {
           setIsLoadingHistory(false);
         });
     } else {
       setMessages([]);
-      setConversationTitle("NEW CONVERSATION");
+      setConversationTitle("NEW DISCUSSION");
     }
-  }, [conversationId, isAuthenticated, toast]);
+  }, [conversationId]);
 
-  // Connect to websocket
+  // Connect to websocket hook
   const {
     status,
     streamedContent,
     isStreaming,
+    activeStances,
+    conflictAnalysis: liveConflictAnalysis,
     remaining: wsRemaining,
-    limit: wsLimit,
-    error: wsError,
     sendMessage,
   } = useWebSocket({
-    onCompleted: (content, returnedConvId, title) => {
-      // Append assistant message
+    onDebateComplete: (fullText, conflictData, returnedConvId) => {
       setMessages((prev) => [
         ...prev,
         {
           id: Math.random().toString(),
           role: "assistant",
-          content,
-          agentName: provider === "openai" ? "GPT" : "Claude",
+          content: fullText,
+          agentName: "Nexus Synthesizer",
+          conflictAnalysis: conflictData,
         },
       ]);
-      setConversationTitle(title);
 
-      // Redirect if this was a new conversation
-      if (!conversationId) {
+      if (!conversationId && returnedConvId) {
         setLocation(`/chat/${returnedConvId}`);
       }
     },
     onError: (msg) => {
       toast({
-        title: "Inference Error",
+        title: "Inference Notice",
         description: msg,
         variant: "destructive",
       });
@@ -118,13 +139,12 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, streamedContent, isStreaming]);
+  }, [messages, streamedContent, isStreaming, activeStances]);
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim() || isStreaming) return;
 
-    // Optimistically add user message
     const userPrompt = prompt.trim();
     setMessages((prev) => [
       ...prev,
@@ -135,8 +155,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
       },
     ]);
 
-    // Send via websocket
-    sendMessage(userPrompt, conversationId, provider);
+    sendMessage(userPrompt, conversationId, provider, selectedCouncilId);
     setPrompt("");
   };
 
@@ -151,7 +170,6 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
   };
 
   const remainingQueries = wsRemaining !== null ? wsRemaining : localRemaining;
-  const queryLimit = wsLimit !== null ? wsLimit : (usage?.dailyQueryLimit ?? (isAuthenticated ? 30 : 5));
 
   // Custom code renderer for ReactMarkdown
   const MarkdownComponents = {
@@ -165,8 +183,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
               onClick={() => copyToClipboard(String(children).replace(/\n$/, ""), String(children))}
               className="hover:text-primary transition-colors flex items-center gap-1 cursor-pointer"
             >
-              <Copy size={12} />
-              Copy
+              <Copy size={12} /> Copy
             </button>
           </div>
           <SyntaxHighlighter
@@ -215,14 +232,20 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
             )}
           </h2>
         </div>
+
         <div className="flex items-center gap-3 shrink-0">
           <div
-            onClick={() => setLocation("/usage")}
-            className="border-2 border-secondary rounded-full px-3 py-1 text-xs text-[#00C8FF] font-sans font-bold flex items-center gap-1 cursor-pointer hover:bg-secondary/10 transition-colors"
+            onClick={handleToggleTier}
+            className={`border-2 rounded-full px-3 py-1 text-xs font-sans font-bold flex items-center gap-1 cursor-pointer transition-colors ${
+              userTier === "pro"
+                ? "border-amber-400 text-amber-300 bg-amber-400/10 hover:bg-amber-400/20"
+                : "border-secondary text-[#00C8FF] hover:bg-secondary/10"
+            }`}
             data-testid="chat-header-query-counter"
           >
-            {remainingQueries} queries ⚡
+            {userTier === "pro" ? "UNLIMITED ⚡" : `${remainingQueries} / 10 queries ⚡`}
           </div>
+
           <div className="relative flex items-center justify-center w-2 h-2">
             <motion.div
               className={`absolute w-2 h-2 rounded-full ${
@@ -242,54 +265,38 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
 
       {/* MESSAGES / CHAT CONTAINER */}
       <main className="flex-1 flex flex-col relative overflow-y-auto custom-scrollbar p-6 bg-[#08080B]">
+        {/* COUNCIL SELECTOR AT TOP */}
+        <div className="max-w-3xl w-full mx-auto">
+          <CouncilSelector
+            selectedCouncilId={selectedCouncilId}
+            onSelectCouncil={(cId) => setSelectedCouncilId(cId)}
+            userTier={userTier}
+            onToggleTier={handleToggleTier}
+          />
+        </div>
+
         {isLoadingHistory ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-4">
             <div className="w-12 h-12 border-4 border-[#00C8FF] border-t-transparent rounded-full animate-spin"></div>
-            <p className="font-display text-[9px] text-[#00C8FF] tracking-widest uppercase">Initializing logs...</p>
+            <p className="font-display text-[9px] text-[#00C8FF] tracking-widest uppercase">Loading Council Logs...</p>
           </div>
         ) : messages.length === 0 ? (
-          /* EMPTY STATE (AWAITING PROMPT) */
-          <div className="flex-1 flex flex-col items-center justify-center text-center max-w-xl mx-auto py-12">
+          /* EMPTY STATE */
+          <div className="flex-1 flex flex-col items-center justify-center text-center max-w-xl mx-auto py-8">
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: "spring" }}
               className="w-16 h-16 rounded-2xl bg-primary/10 border-2 border-[#00FFB3] flex items-center justify-center text-3xl mb-6 shadow-[4px_4px_0px_#00FFB3]"
             >
-              🤖
+              🏛️
             </motion.div>
             <h1 className="font-display text-base text-foreground mb-3 tracking-widest">
-              SYSTEM STANDBY
+              MULTI-AGENT COUNCIL STANDBY
             </h1>
-            <p className="text-muted-foreground text-xs leading-relaxed mb-8 font-sans">
-              Nexus AI core inference pipeline is active. Select your preferred LLM provider, supply a context vector, and initiate the query sequence.
+            <p className="text-muted-foreground text-xs leading-relaxed mb-6 font-sans">
+              Select a domain council above or use ✨ Auto-Detect, submit your question, and watch 3 specialized AI agents debate in parallel before synthesizing a final verdict.
             </p>
-
-            {/* PRE-SELECT AGENT CARDS */}
-            <div className="grid grid-cols-2 gap-4 w-full">
-              <button
-                onClick={() => setProvider("openai")}
-                className={`p-4 border-2 rounded-xl text-left transition-all cursor-pointer relative overflow-hidden group ${
-                  provider === "openai"
-                    ? "border-[#00C8FF] bg-[#00C8FF]/5 shadow-[3px_3px_0px_#00C8FF]"
-                    : "border-[#333] bg-[#14141A]/50 hover:border-[#555]"
-                }`}
-              >
-                <div className="font-display text-[9px] text-[#00C8FF] mb-1">GPT-4O</div>
-                <div className="font-sans text-[10px] text-muted-foreground">Fast, reasoning-heavy models.</div>
-              </button>
-              <button
-                onClick={() => setProvider("anthropic")}
-                className={`p-4 border-2 rounded-xl text-left transition-all cursor-pointer relative overflow-hidden group ${
-                  provider === "anthropic"
-                    ? "border-[#FF4FD8] bg-[#FF4FD8]/5 shadow-[3px_3px_0px_#FF4FD8]"
-                    : "border-[#333] bg-[#14141A]/50 hover:border-[#555]"
-                }`}
-              >
-                <div className="font-display text-[9px] text-[#FF4FD8] mb-1">CLAUDE-3.5</div>
-                <div className="font-sans text-[10px] text-muted-foreground">Nuanced creative output.</div>
-              </button>
-            </div>
           </div>
         ) : (
           /* MESSAGE LIST */
@@ -297,65 +304,77 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
             {messages.map((msg) => {
               const isUser = msg.role === "user";
               return (
-                <div
-                  key={msg.id}
-                  className={`flex flex-col max-w-[85%] rounded-2xl border-2 p-4 transition-shadow relative ${
-                    isUser
-                      ? "self-end border-[#00C8FF] bg-[#00C8FF]/5 text-[#E0F7FF] shadow-[3px_3px_0px_rgba(0,200,255,0.2)]"
-                      : "self-start border-[#00FFB3] bg-[#00FFB3]/5 text-[#E0FFF6] shadow-[3px_3px_0px_rgba(0,255,179,0.2)]"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span
-                      className={`font-display text-[9px] uppercase tracking-wider ${
-                        isUser ? "text-[#00C8FF]" : "text-[#00FFB3]"
-                      }`}
-                    >
-                      {isUser ? "User" : msg.agentName || "Agent"}
-                    </span>
-                    {!isUser && (
-                      <button
-                        onClick={() => copyToClipboard(msg.content, msg.id)}
-                        className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                        title="Copy to clipboard"
+                <div key={msg.id} className="flex flex-col w-full">
+                  <div
+                    className={`flex flex-col max-w-[85%] rounded-2xl border-2 p-4 transition-shadow relative ${
+                      isUser
+                        ? "self-end border-[#00C8FF] bg-[#00C8FF]/5 text-[#E0F7FF] shadow-[3px_3px_0px_rgba(0,200,255,0.2)]"
+                        : "self-start border-[#00FFB3] bg-[#00FFB3]/5 text-[#E0FFF6] shadow-[3px_3px_0px_rgba(0,255,179,0.2)]"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span
+                        className={`font-display text-[9px] uppercase tracking-wider ${
+                          isUser ? "text-[#00C8FF]" : "text-[#00FFB3]"
+                        }`}
                       >
-                        {copiedId === msg.id ? (
-                          <Check size={12} className="text-[#00FFB3]" />
-                        ) : (
-                          <Copy size={12} />
-                        )}
-                      </button>
-                    )}
+                        {isUser ? "User Query" : msg.agentName || "Nexus Synthesizer"}
+                      </span>
+                      {!isUser && (
+                        <button
+                          onClick={() => copyToClipboard(msg.content, msg.id)}
+                          className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                        >
+                          {copiedId === msg.id ? <Check size={12} className="text-[#00FFB3]" /> : <Copy size={12} />}
+                        </button>
+                      )}
+                    </div>
+                    <div className="prose prose-invert max-w-none text-xs font-sans leading-relaxed break-words">
+                      {isUser ? (
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                      ) : (
+                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={MarkdownComponents as any}>
+                          {msg.content}
+                        </ReactMarkdown>
+                      )}
+                    </div>
                   </div>
-                  <div className="prose prose-invert max-w-none text-xs font-sans leading-relaxed break-words">
-                    {isUser ? (
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
-                    ) : (
-                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={MarkdownComponents as any}>
-                        {msg.content}
-                      </ReactMarkdown>
-                    )}
-                  </div>
+
+                  {!isUser && msg.conflictAnalysis && (
+                    <ConflictView conflictAnalysis={msg.conflictAnalysis} />
+                  )}
                 </div>
               );
             })}
 
-            {/* LIVE STREAMING RESPONSE BUBBLE */}
+            {/* LIVE DEBATE BUBBLE */}
             {isStreaming && (
-              <div className="flex flex-col max-w-[85%] rounded-2xl border-2 border-[#FF4FD8] bg-[#FF4FD8]/5 text-[#FFEAF9] shadow-[3px_3px_0px_rgba(255,79,216,0.2)] p-4 self-start">
+              <div className="flex flex-col max-w-[90%] rounded-2xl border-2 border-[#FF4FD8] bg-[#FF4FD8]/5 text-[#FFEAF9] shadow-[3px_3px_0px_rgba(255,79,216,0.2)] p-4 self-start w-full">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-display text-[9px] text-[#FF4FD8] uppercase tracking-wider flex items-center gap-1.5">
-                    <Sparkles size={10} className="animate-pulse" />
-                    {provider === "openai" ? "GPT" : "Claude"} Response Streaming...
+                    <Sparkles size={10} className="animate-pulse" /> Parallel Council Debate in Progress...
                   </span>
                 </div>
+
+                {activeStances.length > 0 && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
+                    {activeStances.map((s) => (
+                      <div key={s.role_id} className="p-2 bg-slate-900/80 border border-slate-800 rounded text-xs">
+                        <div className="font-bold text-slate-200 flex items-center gap-1">
+                          <span>{s.icon}</span> {s.role_name}
+                        </div>
+                        <p className="text-[10px] text-slate-400 line-clamp-2 mt-1">{s.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <div className="prose prose-invert max-w-none text-xs font-sans leading-relaxed break-words">
                   {streamedContent ? (
                     <ReactMarkdown remarkPlugins={[remarkGfm]} components={MarkdownComponents as any}>
                       {streamedContent}
                     </ReactMarkdown>
                   ) : (
-                    /* Pulsing Cursor */
                     <div className="flex items-center gap-1.5 py-1">
                       <div className="w-1.5 h-1.5 bg-[#FF4FD8] rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
                       <div className="w-1.5 h-1.5 bg-[#FF4FD8] rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
@@ -363,6 +382,10 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
                     </div>
                   )}
                 </div>
+
+                {liveConflictAnalysis && (
+                  <ConflictView conflictAnalysis={liveConflictAnalysis} />
+                )}
               </div>
             )}
           </div>
@@ -374,42 +397,13 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
       {status !== "Connected" && status !== "Disconnected" && status !== "Idle" && (
         <div className="bg-[#14141A] border-t border-b border-[#333] px-6 py-1.5 text-[10px] font-mono text-muted-foreground flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-[#00FFB3] animate-pulse shrink-0"></span>
-          <span>SYSTEM STATUS: {status.toUpperCase()}</span>
+          <span>COUNCIL ENGINE STATUS: {status.toUpperCase()}</span>
         </div>
       )}
 
       {/* BOTTOM INPUT BAR */}
       <footer className="p-5 border-t-[3px] border-[#00C8FF] bg-[#0D0D12] shrink-0">
         <div className="max-w-[900px] mx-auto flex flex-col gap-3">
-          {/* Provider selector for active discussions */}
-          {messages.length > 0 && (
-            <div className="flex items-center gap-2 self-start bg-[#08080B] border border-[#333] rounded-lg p-1 text-[10px]">
-              <span className="text-muted-foreground px-2">PROVIDER:</span>
-              <button
-                onClick={() => setProvider("openai")}
-                disabled={isStreaming}
-                className={`px-3 py-1 rounded font-display text-[9px] cursor-pointer transition-colors ${
-                  provider === "openai"
-                    ? "bg-[#00C8FF] text-[#08080B]"
-                    : "text-[#00C8FF] hover:bg-white/5"
-                }`}
-              >
-                GPT
-              </button>
-              <button
-                onClick={() => setProvider("anthropic")}
-                disabled={isStreaming}
-                className={`px-3 py-1 rounded font-display text-[9px] cursor-pointer transition-colors ${
-                  provider === "anthropic"
-                    ? "bg-[#FF4FD8] text-[#08080B]"
-                    : "text-[#FF4FD8] hover:bg-white/5"
-                }`}
-              >
-                CLAUDE
-              </button>
-            </div>
-          )}
-
           <form onSubmit={handleSend} className="flex gap-3">
             <div className="flex-1 flex bg-[#08080B] border-[3px] border-primary rounded-xl min-h-[56px] shadow-[4px_4px_0px_#00FFB3] focus-within:shadow-[6px_6px_0px_#00FFB3] transition-shadow">
               <input
@@ -417,7 +411,7 @@ export default function ChatWorkspace({ onOpenSidebar }: ChatWorkspaceProps) {
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 disabled={isStreaming}
-                placeholder="Initialize command sequence..."
+                placeholder="Ask the council a complex question..."
                 className="w-full bg-transparent border-none outline-none py-4 px-5 text-foreground placeholder:text-primary/40 font-sans text-base focus:ring-0 rounded-xl disabled:opacity-50"
                 data-testid="input-chat-prompt"
               />

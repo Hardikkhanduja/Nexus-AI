@@ -4,27 +4,9 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
-const rawPort = process.env.PORT;
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
-
+const rawPort = process.env.PORT || "5173";
 const port = Number(rawPort);
-
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
-}
-
-const basePath = process.env.BASE_PATH;
-
-if (!basePath) {
-  throw new Error(
-    "BASE_PATH environment variable is required but was not provided.",
-  );
-}
+const basePath = process.env.BASE_PATH || "/";
 
 export default defineConfig({
   base: basePath,
@@ -32,19 +14,6 @@ export default defineConfig({
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
-    ...(process.env.NODE_ENV !== "production" &&
-    process.env.REPL_ID !== undefined
-      ? [
-          await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer({
-              root: path.resolve(import.meta.dirname, ".."),
-            }),
-          ),
-          await import("@replit/vite-plugin-dev-banner").then((m) =>
-            m.devBanner(),
-          ),
-        ]
-      : []),
   ],
   resolve: {
     alias: {
@@ -65,16 +34,12 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       "/ws/chat": {
-        target: "ws://localhost:8000",
+        target: "ws://127.0.0.1:3000",
         ws: true,
         changeOrigin: true,
       },
-      "/api/ai": {
-        target: "http://localhost:8000",
-        changeOrigin: true,
-      },
       "/api": {
-        target: "http://localhost:3001",
+        target: "http://127.0.0.1:3000",
         changeOrigin: true,
       },
     },

@@ -1,101 +1,106 @@
 """
 Server-side rate limiting backed by PostgreSQL (user_limits table).
-
-Uses the same table as the Express API for consistency.
+Free Tier: 10 queries/day limit.
+Pro Tier: Unlimited queries/day.
 """
 
 import logging
 from datetime import timezone, datetime
 from typing import Tuple, Optional
-
 import psycopg2.extensions
 
 logger = logging.getLogger(__name__)
 
-# ── Limits ───────────────────────────────────────────────────────
+FREE_DAILY_LIMIT = 10
+PRO_DAILY_LIMIT = 999999  # Unlimited
 
-GUEST_DAILY_LIMIT = 5
-REGISTERED_DAILY_LIMIT = 30
-
+def is_valid_uuid(val: str) -> bool:
+    try:
+        import uuid
+        uuid.UUID(str(val))
+        return True
+    except ValueError:
+        return False
 
 async def check_and_increment(
     conn: Optional[psycopg2.extensions.connection],
-    user_id: Optional[str],
+    clerk_id: Optional[str],
+    user_tier: str = "free"
 ) -> Tuple[bool, int, int]:
     """
-    Check whether the user can make a query and increment if allowed.
-
-    If the database is unavailable, fall back to a permissive local limit so
-    chat can still proceed in development mode.
+    Checks rate limit based on user tier.
+    Free tier = 10 queries/day.
+    Pro tier = Unlimited.
     """
-    if user_id is None:
-        return True, GUEST_DAILY_LIMIT, GUEST_DAILY_LIMIT
+    daily_limit = PRO_DAILY_LIMIT if user_tier == "pro" else FREE_DAILY_LIMIT
+
+    if not clerk_id or clerk_id == "guest":
+        return True, FREE_DAILY_LIMIT, FREE_DAILY_LIMIT
 
     if conn is None:
-        logger.warning("Rate-limit DB connection unavailable; allowing request with fallback limit.")
-        return True, REGISTERED_DAILY_LIMIT, REGISTERED_DAILY_LIMIT
+        return True, daily_limit, daily_limit
 
     try:
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
         with conn.cursor() as cur:
+            # 1. Ensure user_limits row exists
             cur.execute(
                 """
-                INSERT INTO user_limits (user_id, queries_used_today, last_reset_date)
+                INSERT INTO user_limits (clerk_id, queries_used_today, last_reset_date)
                 VALUES (%s, 0, %s)
-                ON CONFLICT (user_id) DO NOTHING
+                ON CONFLICT (clerk_id) DO NOTHING
                 """,
-                (user_id, today_str),
+                (clerk_id, today_str),
             )
 
+            # 2. Fetch current count
             cur.execute(
-                "SELECT queries_used_today, last_reset_date FROM user_limits WHERE user_id = %s",
-                (user_id,),
+                "SELECT queries_used_today, last_reset_date FROM user_limits WHERE clerk_id = %s",
+                (clerk_id,),
             )
             row = cur.fetchone()
             if not row:
                 conn.commit()
-                return True, REGISTERED_DAILY_LIMIT, REGISTERED_DAILY_LIMIT
+                return True, daily_limit, daily_limit
 
             queries_used, last_reset = row
 
+            # Reset count if it's a new day
             if str(last_reset) != today_str:
                 cur.execute(
                     """
                     UPDATE user_limits
                     SET queries_used_today = 0, last_reset_date = %s
-                    WHERE user_id = %s
+                    WHERE clerk_id = %s
                     """,
-                    (today_str, user_id),
+                    (today_str, clerk_id),
                 )
                 queries_used = 0
 
-            if queries_used >= REGISTERED_DAILY_LIMIT:
+            # Pro Tier = Always Unlimited
+            if user_tier == "pro":
+                cur.execute(
+                    "UPDATE user_limits SET queries_used_today = queries_used_today + 1 WHERE clerk_id = %s",
+                    (clerk_id,),
+                )
                 conn.commit()
-                return False, 0, REGISTERED_DAILY_LIMIT
+                return True, 9999, 9999
 
+            # Free Tier = Cap at 10
+            if queries_used >= FREE_DAILY_LIMIT:
+                conn.commit()
+                return False, 0, FREE_DAILY_LIMIT
+
+            # Increment count
             cur.execute(
-                """
-                UPDATE user_limits
-                SET queries_used_today = queries_used_today + 1
-                WHERE user_id = %s
-                """,
-                (user_id,),
+                "UPDATE user_limits SET queries_used_today = queries_used_today + 1 WHERE clerk_id = %s",
+                (clerk_id,),
             )
-
-            cur.execute(
-                """
-                UPDATE users
-                SET total_lifetime_queries = total_lifetime_queries + 1
-                WHERE id = %s
-                """,
-                (user_id,),
-            )
-
             conn.commit()
 
-            remaining = REGISTERED_DAILY_LIMIT - (queries_used + 1)
-            return True, max(remaining, 0), REGISTERED_DAILY_LIMIT
+            remaining = FREE_DAILY_LIMIT - (queries_used + 1)
+            return True, max(remaining, 0), FREE_DAILY_LIMIT
     except Exception as exc:
-        logger.warning(f"Rate-limit check failed; using fallback response: {exc}")
-        return True, REGISTERED_DAILY_LIMIT, REGISTERED_DAILY_LIMIT
+        logger.warning(f"Rate-limit check error: {exc}")
+        return True, daily_limit, daily_limit

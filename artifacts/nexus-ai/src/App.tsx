@@ -3,6 +3,7 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ClerkProvider } from "@clerk/clerk-react";
 
 import { PixelBackground } from "@/components/PixelBackground";
 import { Sidebar } from "@/components/Sidebar";
@@ -16,6 +17,8 @@ import UsagePage from "@/pages/UsagePage";
 import NotFound from "@/pages/not-found";
 import { AuthProvider } from "@/contexts/AuthContext";
 
+const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+
 const queryClient = new QueryClient();
 
 function AppRouter() {
@@ -27,7 +30,7 @@ function AppRouter() {
       <PixelBackground />
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       
-      <div className="relative z-10 w-full h-[100dvh]">
+      <div className="relative z-10 w-full h-dvh">
         <Switch>
           <Route path="/">
             <LandingPage onOpenSidebar={openSidebar} />
@@ -60,7 +63,7 @@ function AppRouter() {
 }
 
 function App() {
-  return (
+  const content = (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
@@ -72,6 +75,16 @@ function App() {
       </TooltipProvider>
     </QueryClientProvider>
   );
+
+  if (PUBLISHABLE_KEY) {
+    return (
+      <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignOutUrl="/">
+        {content}
+      </ClerkProvider>
+    );
+  }
+
+  return content;
 }
 
 export default App;
