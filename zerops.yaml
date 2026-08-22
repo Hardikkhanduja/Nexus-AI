@@ -1,0 +1,41 @@
+# ==============================================================================
+# Zerops.yaml — Nexus AI Production Infrastructure & Multi-Service Deployment
+# ==============================================================================
+
+zerops:
+  # ----------------------------------------------------------------------------
+  # 1. Managed PostgreSQL 16 Database Service
+  # ----------------------------------------------------------------------------
+  - setup: db
+    type: postgresql@16
+
+  # ----------------------------------------------------------------------------
+  # 2. FastAPI Python Web Server (AI Council Engine & Real-Time WebSockets)
+  # ----------------------------------------------------------------------------
+  - setup: api
+    type: python@3.11
+    build:
+      base: python@3.11
+      buildCommands:
+        - pip install --upgrade pip
+        - pip install -r backend/requirements.txt
+      deployFiles:
+        - backend
+    run:
+      base: python@3.11
+      start: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --ws auto --proxy-headers --forwarded-allow-ips='*'
+      envVariables:
+        PORT: "8000"
+        PYTHONPATH: "."
+
+  # ----------------------------------------------------------------------------
+  # 3. Cyberpunk React Vite Single-Page Application (Frontend)
+  # ----------------------------------------------------------------------------
+  - setup: app
+    type: static
+    build:
+      base: nodejs@20
+      buildCommands:
+        - cd artifacts/nexus-ai && npm install && npm run build
+      deployFiles:
+        - artifacts/nexus-ai/dist/~
