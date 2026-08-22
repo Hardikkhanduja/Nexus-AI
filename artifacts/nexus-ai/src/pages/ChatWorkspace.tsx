@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Copy, Sparkles, Check, Zap, Landmark, Home, Share2, X, ExternalLink, FileText } from "lucide-react";
+import { Send, Copy, Sparkles, Check, Zap, Landmark, Share2, X, ExternalLink, FileText } from "lucide-react";
 import { useUsage } from "@/hooks/useUsage";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";

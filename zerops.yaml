@@ -27,4 +27,4 @@ zerops:
       buildCommands:
         - cd artifacts/nexus-ai && npm install && npm run build
       deployFiles:
-        - artifacts/nexus-ai/dist/~
+        - artifacts/nexus-ai/dist/public/~
