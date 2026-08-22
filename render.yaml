@@ -14,8 +14,9 @@ services:
         value: .
 
   # 2. React Vite Static Frontend
-  - type: static
+  - type: web
     name: nexus-ai-frontend
+    env: static
     buildCommand: cd artifacts/nexus-ai && npm install && npm run build
     staticPublishPath: ./artifacts/nexus-ai/dist/public
     routes:
