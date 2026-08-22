@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useUsage } from "@/hooks/useUsage";
-import { useUser, SignedIn, UserButton } from "@clerk/clerk-react";
+import { useClerkSafe, SafeSignedIn as SignedIn, SafeUserButton as UserButton } from "@/lib/clerk";
 import { useLocation, Link } from "wouter";
 import {
   Gauge,
@@ -27,7 +27,7 @@ interface UsagePageProps {
 
 export default function UsagePage({ onOpenSidebar }: UsagePageProps) {
   const [, setLocation] = useLocation();
-  const { isSignedIn } = useUser();
+  const { isSignedIn } = useClerkSafe();
   const { usage, remaining, isLoading, hasError, refetch } = useUsage();
 
   const [countdown, setCountdown] = useState("00:00:00");

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
-import { SignedIn, UserButton } from "@clerk/clerk-react";
+import { SafeSignedIn as SignedIn, SafeUserButton as UserButton } from "@/lib/clerk";
 import { Link } from "wouter";
 import { Bot, Brain, Sparkles, Search, Zap, Target, Edit3, Home } from "lucide-react";
 

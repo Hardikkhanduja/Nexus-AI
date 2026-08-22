@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, Link } from "wouter";
-import { SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
+import { SafeSignedIn as SignedIn, SafeSignedOut as SignedOut, SafeUserButton as UserButton } from "@/lib/clerk";
 import { useUsage } from "@/hooks/useUsage";
 import { Bot, Brain, Sparkles, Search, Zap, Target } from "lucide-react";
 

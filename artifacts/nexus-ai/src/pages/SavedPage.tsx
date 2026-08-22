@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
-import { SignedIn, UserButton } from "@clerk/clerk-react";
+import { SafeSignedIn as SignedIn, SafeUserButton as UserButton } from "@/lib/clerk";
 import {
   Bookmark,
   Search,
