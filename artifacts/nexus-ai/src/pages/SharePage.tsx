@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { useParams, useLocation } from "wouter";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import ConflictView from "@/components/ConflictView";
+import { ConflictView } from "@/components/ConflictView";
 import { 
   Share2, Landmark, Copy, Check, Plus, ArrowRight 
 } from "lucide-react";
