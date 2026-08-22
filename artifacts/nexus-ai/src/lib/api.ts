@@ -13,7 +13,7 @@ export function getApiBaseUrl(): string {
     const host = window.location.host;
     // Handle Zerops production environment dynamically: app-24a.ny1.zerops.app -> https://api-24a-8000.ny1.zerops.app
     if (host.includes(".zerops.app")) {
-      const apiHost = host.replace(/^app-/, "api-").replace(/(\.[a-z0-9]+\.zerops\.app)$/, "-8000$1");
+      const apiHost = host.replace(/^app-/, "api-").replace(/(\.[a-z0-9]+\.zerops\.app)$/, "-8080$1");
       return `${window.location.protocol}//${apiHost}`;
     }
   }
@@ -37,7 +37,7 @@ export function getWsUrl(): string {
     const host = window.location.host;
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     if (host.includes(".zerops.app")) {
-      const apiHost = host.replace(/^app-/, "api-").replace(/(\.[a-z0-9]+\.zerops\.app)$/, "-8000$1");
+      const apiHost = host.replace(/^app-/, "api-").replace(/(\.[a-z0-9]+\.zerops\.app)$/, "-8080$1");
       return `${protocol}//${apiHost}/ws/chat`;
     }
     return `${protocol}//${host}/ws/chat`;
