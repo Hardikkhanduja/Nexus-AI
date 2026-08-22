@@ -1,4 +1,4 @@
-# Zerops Deployment Configuration for Nexus AI (v1.0.1)
+# Zerops Deployment Configuration for Nexus AI
 
 services:
   # 1. Managed PostgreSQL Database
@@ -28,8 +28,6 @@ services:
     build:
       base: nodejs@20
       buildCommands:
-        - npm install -g pnpm@10.5.2
-        - pnpm install --no-frozen-lockfile
-        - pnpm --filter @workspace/nexus-ai run build
+        - cd artifacts/nexus-ai && npm install && npm run build
       deployFiles:
         - artifacts/nexus-ai/dist/~
